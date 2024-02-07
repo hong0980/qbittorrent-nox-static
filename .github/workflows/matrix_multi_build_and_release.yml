@@ -68,7 +68,7 @@ jobs:
 
     steps:
       - name: Checkout ${{github.event.inputs.distinct_id}}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Docker 初始环境 ${{github.event.inputs.distinct_id}}
         run: |
@@ -175,7 +175,7 @@ jobs:
 
     steps:
       - name: Checkout ${{github.event.inputs.distinct_id}}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: 下载 qBittorrent-nox 文件 ${{github.event.inputs.distinct_id}}
         uses: actions/download-artifact@v3
@@ -223,7 +223,7 @@ jobs:
     env:
       GH_TOKEN: "${{secrets.GITHUB_TOKEN}}"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: 编译失败后触发重新编译
         run: |
           inputs_retries="${{inputs.retries}}"
