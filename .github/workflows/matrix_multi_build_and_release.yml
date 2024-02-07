@@ -1,0 +1,230 @@
+# @credits https://github.com/c0re100/qBittorrent-Enhanced-Edition
+name: 编译和发布 qBittorrent
+
+on:
+  workflow_dispatch:
+    inputs:
+      distinct_id:
+        description: "流程运行 ID"
+
+      qbt_qbittorrent_tag:
+        description: "qbittorrent版本选择 release-x.x.x"
+
+      qbt_skip_icu:
+        description: "取消 icu 依赖"
+        required: true
+        default: "yes"
+        type: choice
+        options: ["no", "yes"]
+
+      qbt_workflow_files:
+        description: "是否从 userdocs/qbt-workflow-files 下载源码"
+        required: true
+        default: "no"
+        type: choice
+        options: ["no", "yes"]
+
+      skip_rerun:
+        description: "跳过重新运行"
+        required: true
+        type: boolean
+
+      retries:
+        description: "重试次数"
+        required: true
+        default: "2"
+        type: choice
+        options: ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
+
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os_id: ["alpine"]
+        os_version_id: ["edge"]
+        qbt_cross_name: [ "armhf", "armv7", "aarch64", "x86_64", "x86" ]
+        # qbt_cross_name: [ "armel", "armhf", "armv7", "aarch64", "x86_64", "x86", "s390x", "powerpc", "ppc64el", "mips", "mipsel", "mips64", "mips64el", "riscv64", ]
+        qbt_libtorrent_version: ["1.2", "2.0"]
+        qbt_build_tool: ["", "cmake"]
+        include:
+          - qbt_build_tool: ""
+            qbt_qt_version_name: "qt5-"
+            qbt_qt_version: "5"
+
+          - qbt_build_tool: "cmake"
+            qbt_qt_version_name: "qt6-"
+            qbt_qt_version: "6"
+
+    name: "qBittorrent-${{matrix.qbt_cross_name}}-${{matrix.qbt_qt_version_name}}libtorrent-v${{matrix.qbt_libtorrent_version}}"
+
+    env:
+      qbt_build_dir: "qbt-build"
+
+    steps:
+      - name: Checkout ${{github.event.inputs.distinct_id}}
+        uses: actions/checkout@v3
+
+      - name: Docker 初始环境 ${{github.event.inputs.distinct_id}}
+        run: |
+          sudo rm -f /etc/apt/apt.conf.d/*
+          echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' | sudo tee /etc/apt/apt.conf.d/01keep-debs
+          echo -e 'Acquire::https::Verify-Peer "false";\nAcquire::https::Verify-Host "false";' | sudo tee /etc/apt/apt.conf.d/99-phased-updates
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install lunar libpipeline1 qemu-user-static binfmt-support
+          # echo "qbt_qt_tag=" >> env.custom
+          # echo "qbt_cache_dir= >> env.custom
+          # echo "qbt_boost_tag=" >> env.custom
+          # echo "qbt_libtorrent_tag=" >> env.custom
+          echo "qbt_build_debug=no" >> env.custom
+          echo "qbt_optimise_strip=yes" >> env.custom
+          echo "qbt_workflow_artifacts=no" >> env.custom
+          echo "qbt_libtorrent_master_jamfile=no" >> env.custom
+          echo "qbt_patches_url=${{github.repository}}" >> env.custom
+          echo "qbt_revision_url=${{github.repository}}" >> env.custom
+          echo "qbt_qt_version=${{matrix.qbt_qt_version}}" >> env.custom
+          echo "qbt_build_tool=${{matrix.qbt_build_tool}}" >> env.custom
+          echo "qbt_cross_name=${{matrix.qbt_cross_name}}" >> env.custom
+          echo "qbt_skip_icu=${{github.event.inputs.qbt_skip_icu}}" >> env.custom
+          echo "qbt_qt_version_name=${{matrix.qbt_qt_version_name}}" >> env.custom
+          echo "qbt_libtorrent_version=${{matrix.qbt_libtorrent_version}}" >> env.custom
+          echo "qbt_workflow_files=${{github.event.inputs.qbt_workflow_files}}" >> env.custom
+          echo "qbt_qbittorrent_tag=${{github.event.inputs.qbt_qbittorrent_tag}}" >> env.custom
+          docker run --name multiarch -it -d --env-file env.custom -w /root -v ${{github.workspace}}:/root ${{matrix.os_id}}:${{matrix.os_version_id}}
+          docker exec -w /root multiarch apk update
+          docker exec -w /root multiarch apk add bash tzdata
+
+      - name: Docker 安装依赖  ${{github.event.inputs.distinct_id}}
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh -bs-a
+
+      - name: Docker - zlib-ng ${{github.event.inputs.distinct_id}}
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh zlib
+
+      - name: Docker - iconv ${{github.event.inputs.distinct_id}}
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh iconv
+
+      - name: Docker - icu ${{github.event.inputs.distinct_id}}
+        if: github.event.inputs.qbt_skip_icu == 'no'
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh icu
+
+      - name: Docker - openssl ${{github.event.inputs.distinct_id}}
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh openssl
+
+      - name: Docker - boost ${{github.event.inputs.distinct_id}}
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh boost
+
+      - name: Docker - libtorrent ${{github.event.inputs.distinct_id}}
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh libtorrent
+
+      - name: Docker - double_conversion ${{github.event.inputs.distinct_id}}
+        if: matrix.qbt_build_tool == 'cmake'
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh double_conversion
+
+      - name: Docker - qtbase ${{github.event.inputs.distinct_id}}
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh qtbase
+
+      - name: Docker - qttools ${{github.event.inputs.distinct_id}}
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh qttools
+
+      - name: Docker - qBittorrent ${{github.event.inputs.distinct_id}}
+        id: compile
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh qbittorrent
+
+      - name: 上传到 Artifacts ${{github.event.inputs.distinct_id}}
+        if: steps.compile.conclusion == 'success' && !cancelled()
+        uses: actions/upload-artifact@v3
+        with:
+          name: libtorrent-v${{matrix.qbt_libtorrent_version}}-${{matrix.qbt_cross_name}}-${{matrix.qbt_qt_version_name}}qBittorrent-nox
+          path: |
+            ${{env.qbt_build_dir}}/completed/*
+            !${{env.qbt_build_dir}}/completed/*.png
+
+      - name: graphs 上传到 Artifacts ${{github.event.inputs.distinct_id}}
+        if: matrix.qbt_build_tool == 'cmake' && steps.compile.conclusion == 'success' && !cancelled()
+        uses: actions/upload-artifact@v3
+        with:
+          name: "${{matrix.qbt_cross_name}}-libtorrent-v${{matrix.qbt_libtorrent_version}}-graphs"
+          path: "${{env.qbt_build_dir}}/completed/*.png"
+
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    needs: build
+    if: always() && contains(needs.*.result, 'success') && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    strategy:
+      fail-fast: false
+      matrix:
+        qbt_libtorrent_version: ["1.2", "2.0"]
+        include:
+          - qbt_libtorrent_version: "2.0"
+            preview_release: true
+
+          - qbt_libtorrent_version: "1.2"
+            preview_release: false
+
+    name: "发布 libtorrent-v${{matrix.qbt_libtorrent_version}}-qBittorrent"
+
+    env:
+      qbt_build_dir: "qbt-build"
+
+    steps:
+      - name: Checkout ${{github.event.inputs.distinct_id}}
+        uses: actions/checkout@v3
+
+      - name: 下载 qBittorrent-nox 文件 ${{github.event.inputs.distinct_id}}
+        uses: actions/download-artifact@v3
+
+      - name: 整理发布内容 ${{github.event.inputs.distinct_id}}
+        id: releases
+        run: |
+          pandoc_git_tag="$(git ls-remote -q -t --refs https://github.com/jgm/pandoc.git | awk '/tags\/[0-9]/{sub("refs/tags/", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
+          curl -sLo- "https://github.com/jgm/pandoc/releases/latest/download/pandoc-${pandoc_git_tag}-linux-amd64.tar.gz" | tar xzf - --strip-components 2 -C "$(pwd)" --exclude="share"
+          mkdir -p "1.2" "2.0"
+          for files in libtorrent-v1.2-*nox; do
+              cp -rf ${files}/* "1.2/"
+          done
+          for files in libtorrent-v2.0-*nox; do
+              cp -rf ${files}/* "2.0/"
+          done
+          paste -d '\n' 1.2/qt5-*-release.md | uniq > 1.2/tmp-release.md
+          paste -d '\n' 2.0/qt6-*-release.md | uniq > 2.0/tmp-release.md
+          paste -d '\n' 1.2/tmp-release.md 2.0/tmp-release.md | uniq > tmp-release.md
+          ./pandoc --wrap=preserve -f gfm tmp-release.md -t gfm -o release.md
+          paste -d '\n' 1.2/qt5-dependency-version.json 2.0/qt6-dependency-version.json | uniq > dependency-version.json
+          echo "release_tag=$(cat ${{matrix.qbt_libtorrent_version}}/tag.md)" >> $GITHUB_ENV
+          echo "release_title=$(cat ${{matrix.qbt_libtorrent_version}}/title.md)" >> $GITHUB_ENV
+
+      - name: 发布 release ${{github.event.inputs.distinct_id}}
+        if: steps.releases.conclusion == 'success' && !cancelled()
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: "release.md"
+          token: ${{secrets.GITHUB_TOKEN}}
+          name: "${{env.release_title}}"
+          tag_name: "${{env.release_tag}}"
+          prerelease: "${{matrix.preview_release}}"
+          files: |
+            dependency-version.json
+            ${{matrix.qbt_libtorrent_version}}/*qbittorrent*nox
+
+  rerun-on-failure:
+    if: failure() && inputs.skip_rerun == '0'
+    name: 失败时重新运行
+    needs: release
+    permissions:
+      actions: write
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: "${{secrets.GITHUB_TOKEN}}"
+    steps:
+      - uses: actions/checkout@v3
+      - name: 编译失败后触发重新编译
+        run: |
+          inputs_retries="${{inputs.retries}}"
+          gh workflow run rerun.yml -f run_id=${{github.run_id}} -f attempts=${{github.run_attempt}} -f retries=${inputs_retries:-5}

@@ -1,0 +1,2639 @@
+diff -ruN a/src/base/bittorrent/peer_blacklist.hpp b/src/base/bittorrent/peer_blacklist.hpp
+--- a/src/base/bittorrent/peer_blacklist.hpp	1970-01-01 08:00:00.000000000 +0800
++++ b/src/base/bittorrent/peer_blacklist.hpp	2023-05-30 00:23:36.000000000 +0800
+@@ -0,0 +1,107 @@
++#pragma once
++
++#include <regex>
++
++#include <libtorrent/torrent_info.hpp>
++
++#include <QHostAddress>
++
++#include "base/net/geoipmanager.h"
++
++#include "peer_filter_plugin.hpp"
++#include "peer_logger.hpp"
++
++// bad peer filter
++bool is_bad_peer(const lt::peer_info& info)
++{
++  std::regex id_filter("-(XL|SD|XF|QD|BN|DL|TS)(\\d+)-");
++  std::regex ua_filter(R"((\d+.\d+.\d+.\d+|cacao_torrent))");
++  return std::regex_match(info.pid.data(), info.pid.data() + 8, id_filter) || std::regex_match(info.client, ua_filter);
++}
++
++// Unknown Peer filter
++bool is_unknown_peer(const lt::peer_info& info)
++{
++  QString country = Net::GeoIPManager::instance()->lookup(QHostAddress(info.ip.data()));
++  return info.client.find("Unknown") != std::string::npos && country == QLatin1String("CN");
++}
++
++// Offline Downloader filter
++bool is_offline_downloader(const lt::peer_info& info)
++{
++  std::regex id_filter("-LT(1220|2070)-");
++  unsigned short port = info.ip.port();
++  QString country = Net::GeoIPManager::instance()->lookup(QHostAddress(info.ip.data()));
++  // 115: Old data, may out of date.
++  bool fake_transmission = port >= 65000 && country == QLatin1String("CN") && info.client.find("Transmission") != std::string::npos;
++  // PikPak: PikPak is renting Worldstream server and announce as LT1220/LT2070, the best way is block the ip range via ip filter(?)
++  // Xunlei: it seems Xunlei is using LT2070 too
++  bool fake_libtorrent = (country == QLatin1String("NL") || country == QLatin1String("CN")) && std::regex_match(info.pid.data(), info.pid.data() + 8, id_filter);
++  return fake_transmission || fake_libtorrent;
++}
++
++// BitTorrent Media Player Peer filter
++bool is_bittorrent_media_player(const lt::peer_info& info)
++{
++  if (info.client.find("StellarPlayer") != std::string::npos) {
++    return true;
++  }
++  std::regex player_filter("-(UW\\w{4}|SP(([0-2]\\d{3})|(3[0-5]\\d{2})))-");
++  return !!std::regex_match(info.pid.data(), info.pid.data() + 8, player_filter);
++}
++
++
++// drop connection action
++void drop_connection(lt::peer_connection_handle ph)
++{
++  ph.disconnect(boost::asio::error::connection_refused, lt::operation_t::bittorrent, lt::disconnect_severity_t{0});
++}
++
++
++template<typename F>
++auto wrap_filter(F filter, const std::string& tag)
++{
++  return [=](const lt::peer_info& info, bool handshake, bool* stop_filtering) {
++    bool matched = filter(info);
++    *stop_filtering = !handshake && !matched;
++    if (matched)
++      peer_logger_singleton::instance().log_peer(info, tag);
++    return matched;
++  };
++}
++
++
++std::shared_ptr<lt::torrent_plugin> create_peer_action_plugin(
++    const lt::torrent_handle& th,
++    filter_function filter,
++    action_function action)
++{
++  // ignore private torrents
++  if (th.torrent_file() && th.torrent_file()->priv())
++    return nullptr;
++
++  return std::make_shared<peer_action_plugin>(std::move(filter), std::move(action));
++}
++
++
++// plugins factory functions
++
++std::shared_ptr<lt::torrent_plugin> create_drop_bad_peers_plugin(lt::torrent_handle const& th, client_data)
++{
++  return create_peer_action_plugin(th, wrap_filter(is_bad_peer, "bad peer"), drop_connection);
++}
++
++std::shared_ptr<lt::torrent_plugin> create_drop_unknown_peers_plugin(lt::torrent_handle const& th, client_data)
++{
++  return create_peer_action_plugin(th, wrap_filter(is_unknown_peer, "unknown peer"), drop_connection);
++}
++
++std::shared_ptr<lt::torrent_plugin> create_drop_offline_downloader_plugin(lt::torrent_handle const& th, client_data)
++{
++  return create_peer_action_plugin(th, wrap_filter(is_offline_downloader, "offline downloader"), drop_connection);
++}
++
++std::shared_ptr<lt::torrent_plugin> create_drop_bittorrent_media_player_plugin(lt::torrent_handle const& th, client_data)
++{
++  return create_peer_action_plugin(th, wrap_filter(is_bittorrent_media_player, "bittorrent media player"), drop_connection);
++}
+diff -ruN a/src/base/bittorrent/peer_filter.hpp b/src/base/bittorrent/peer_filter.hpp
+--- a/src/base/bittorrent/peer_filter.hpp	1970-01-01 08:00:00.000000000 +0800
++++ b/src/base/bittorrent/peer_filter.hpp	2023-05-30 00:23:36.000000000 +0800
+@@ -0,0 +1,69 @@
++#pragma once
++
++#include <algorithm>
++#include <fstream>
++#include <string>
++
++#include <QFileInfo>
++#include <QRegularExpression>
++#include <QString>
++#include <QVector>
++
++#include <libtorrent/peer_info.hpp>
++
++#include "base/logger.h"
++
++namespace {
++
++bool qregex_has_match(const QRegularExpression& re, const QString& str)
++{
++  auto m = re.match(str);
++  return m.hasMatch();
++}
++
++}
++
++class peer_filter
++{
++public:
++  explicit peer_filter(const QString& filter_file)
++  {
++    QString log_tag = QFileInfo(filter_file).fileName();
++
++    std::ifstream ifs(filter_file.toStdString());
++    std::string peer_id, client;
++    while (ifs >> peer_id >> client) {
++      QRegularExpression peer_id_re(QString::fromStdString(peer_id));
++      QRegularExpression client_re(QString::fromStdString(client));
++
++      auto msg_tmpl = u"'%1': invalid %2 matching expression '%3' detected at line %4, ignoring rule"_qs;
++      int line = m_filters.size() + 1;
++
++      if (!peer_id_re.isValid())
++        LogMsg(msg_tmpl.arg(log_tag).arg(u"peer id"_qs).arg(peer_id_re.pattern()).arg(line), Log::WARNING);
++
++      if (!client_re.isValid())
++        LogMsg(msg_tmpl.arg(log_tag).arg(u"client name"_qs).arg(client_re.pattern()).arg(line), Log::WARNING);
++
++      if (peer_id_re.isValid() && client_re.isValid())
++        m_filters.append({peer_id_re, client_re});
++    }
++  }
++
++  bool match_peer(const lt::peer_info& info, bool skip_name) const
++  {
++    QString peer_id = QString::fromLatin1(info.pid.data(), 8);
++    QString client = QString::fromStdString(info.client);
++    return std::any_of(m_filters.begin(), m_filters.end(),
++                       [&](const auto& filter) {
++                           return qregex_has_match(filter[0], peer_id) &&
++                               (skip_name || qregex_has_match(filter[1], client));
++                       });
++  }
++
++  bool is_empty() const { return m_filters.isEmpty(); }
++  int rules_count() const { return m_filters.size(); }
++
++private:
++  QVector<QVector<QRegularExpression>> m_filters;
++};
+diff -ruN a/src/base/bittorrent/peer_filter_plugin.hpp b/src/base/bittorrent/peer_filter_plugin.hpp
+--- a/src/base/bittorrent/peer_filter_plugin.hpp	1970-01-01 08:00:00.000000000 +0800
++++ b/src/base/bittorrent/peer_filter_plugin.hpp	2023-05-30 00:23:36.000000000 +0800
+@@ -0,0 +1,123 @@
++#pragma once
++
++#include <libtorrent/extensions.hpp>
++#include <libtorrent/peer_connection_handle.hpp>
++
++#if (LIBTORRENT_VERSION_NUM >= 20000)
++using client_data = lt::client_data_t;
++#else
++using client_data = void*;
++#endif
++
++using filter_function = std::function<bool(const lt::peer_info&, bool, bool*)>;
++using action_function = std::function<void(lt::peer_connection_handle)>;
++
++class peer_filter_plugin final : public lt::peer_plugin
++{
++public:
++  peer_filter_plugin(lt::peer_connection_handle p, filter_function filter, action_function action)
++    : m_peer_connection(p)
++    , m_filter(std::move(filter))
++    , m_action(std::move(action))
++  {}
++
++  bool on_handshake(lt::span<char const> d) override
++  {
++    handle_peer(true);
++    return peer_plugin::on_handshake(d);
++  }
++
++  bool on_extension_handshake(lt::bdecode_node const& d) override
++  {
++    handle_peer(true);
++    return peer_plugin::on_extension_handshake(d);
++  }
++
++  bool on_interested() override
++  {
++    handle_peer();
++    return peer_plugin::on_interested();
++  }
++
++  bool on_not_interested() override
++  {
++    handle_peer();
++    return peer_plugin::on_not_interested();
++  }
++
++  bool on_have(lt::piece_index_t p) override
++  {
++    handle_peer();
++    return peer_plugin::on_have(p);
++  }
++
++  bool on_dont_have(lt::piece_index_t p) override
++  {
++    handle_peer();
++    return peer_plugin::on_dont_have(p);
++  }
++
++  bool on_bitfield(lt::bitfield const& bitfield) override
++  {
++    handle_peer();
++    return peer_plugin::on_bitfield(bitfield);
++  }
++
++  bool on_have_all() override
++  {
++    handle_peer();
++    return peer_plugin::on_have_all();
++  }
++
++  bool on_have_none() override
++  {
++    handle_peer();
++    return peer_plugin::on_have_none();
++  }
++
++  bool on_request(lt::peer_request const& r) override
++  {
++    handle_peer();
++    return peer_plugin::on_request(r);
++  }
++
++protected:
++  void handle_peer(bool handshake = false)
++  {
++    if (m_stop_filtering)
++      return;
++
++    lt::peer_info info;
++    m_peer_connection.get_peer_info(info);
++
++    if (m_filter(info, handshake, &m_stop_filtering))
++      m_action(m_peer_connection);
++  }
++
++private:
++  lt::peer_connection_handle m_peer_connection;
++
++  filter_function m_filter;
++  action_function m_action;
++
++  bool m_stop_filtering = false;
++};
++
++
++class peer_action_plugin : public lt::torrent_plugin
++{
++public:
++  peer_action_plugin(filter_function filter, action_function action)
++    : m_filter(std::move(filter))
++    , m_action(std::move(action))
++  {}
++
++  std::shared_ptr<lt::peer_plugin> new_connection(lt::peer_connection_handle const& p) override
++  {
++    return std::make_shared<peer_filter_plugin>(p, m_filter, m_action);
++  }
++
++private:
++  filter_function m_filter;
++  action_function m_action;
++};
+diff -ruN a/src/base/bittorrent/peer_filter_session_plugin.hpp b/src/base/bittorrent/peer_filter_session_plugin.hpp
+--- a/src/base/bittorrent/peer_filter_session_plugin.hpp	1970-01-01 08:00:00.000000000 +0800
++++ b/src/base/bittorrent/peer_filter_session_plugin.hpp	2023-05-30 00:23:36.000000000 +0800
+@@ -0,0 +1,99 @@
++#pragma once
++
++#include <QDir>
++
++#include "base/logger.h"
++#include "base/profile.h"
++#include "base/path.h"
++
++#include "peer_filter_plugin.hpp"
++#include "peer_filter.hpp"
++#include "peer_logger.hpp"
++
++// filter factory function
++std::unique_ptr<peer_filter> create_peer_filter(const QString& filename)
++{
++  Path qbt_data_dir = specialFolderLocation(SpecialFolder::Data) / Path(filename);
++
++  QString filter_file = qbt_data_dir.toString();
++  // do not create plugin if filter file doesn't exists
++  if (!QFile::exists(filter_file)) {
++    LogMsg(u"'%1' doesn't exist. The corresponding filter is disabled."_qs.arg(filename), Log::NORMAL);
++
++    return nullptr;
++  }
++
++  auto filter = std::make_unique<peer_filter>(filter_file);
++  if (filter->is_empty()) {
++    LogMsg(u"'%1' has no valid rules. The corresponding filter is disabled."_qs.arg(filename), Log::WARNING);
++    filter.reset();
++  } else {
++    LogMsg(u"'%1' contains %2 valid rules."_qs.arg(filename).arg(filter->rules_count()), Log::INFO);
++  }
++
++  return filter;
++}
++
++
++// drop connection action
++void drop_peer_connection(lt::peer_connection_handle ph)
++{
++  ph.disconnect(boost::asio::error::connection_refused, lt::operation_t::bittorrent, lt::disconnect_severity_t{0});
++}
++
++
++class peer_filter_session_plugin final : public lt::plugin
++{
++public:
++  peer_filter_session_plugin()
++    : m_blacklist(create_peer_filter(QStringLiteral("peer_blacklist.txt")))
++    , m_whitelist(create_peer_filter(QStringLiteral("peer_whitelist.txt")))
++  {
++  }
++
++  std::shared_ptr<lt::torrent_plugin> new_torrent(const lt::torrent_handle& th, client_data) override
++  {
++    // do not waste CPU and memory for useless objects when no filters are enabled
++    if (!m_blacklist && !m_whitelist)
++      return nullptr;
++
++    // ignore private torrents
++    if (th.torrent_file() && th.torrent_file()->priv())
++      return nullptr;
++
++    return std::make_shared<peer_action_plugin>([this](auto&&... args) { return filter(args...); }, drop_peer_connection);
++  }
++
++protected:
++  bool filter(const lt::peer_info& info, bool handshake, bool* stop_filtering) const
++  {
++    if (m_blacklist) {
++      // always match with both pid & client name when applying blacklist
++      bool matched_blacklist = m_blacklist->match_peer(info, false);
++      if (matched_blacklist) {
++        peer_logger_singleton::instance().log_peer(info, "blacklist");
++        *stop_filtering = true;
++        return true;
++      }
++    }
++
++    if (m_whitelist) {
++      bool matched_whitelist = m_whitelist->match_peer(info, handshake);
++      if (!matched_whitelist) {
++        peer_logger_singleton::instance().log_peer(info, "whitelist");
++        *stop_filtering = true;
++        return true;
++      }
++    }
++
++    // if the peer got passed the handshake phase and get here, don't filter it anymore
++    if (!handshake) {
++      *stop_filtering = true;
++    }
++    return false;
++  }
++
++private:
++  std::unique_ptr<peer_filter> m_blacklist;
++  std::unique_ptr<peer_filter> m_whitelist;
++};
+diff -ruN a/src/base/bittorrent/peer_logger.hpp b/src/base/bittorrent/peer_logger.hpp
+--- a/src/base/bittorrent/peer_logger.hpp	1970-01-01 08:00:00.000000000 +0800
++++ b/src/base/bittorrent/peer_logger.hpp	2023-05-30 00:23:36.000000000 +0800
+@@ -0,0 +1,103 @@
++#pragma once
++
++#include <libtorrent/peer_info.hpp>
++
++#include <QSqlDatabase>
++#include <QSqlQuery>
++
++#include <QVariant>
++
++
++class db_connection
++{
++public:
++  static db_connection& instance()
++  {
++    static db_connection c;
++    return c;
++  }
++
++  void init(const QString& db_path)
++  {
++    m_db.setDatabaseName(db_path);
++    m_db.open();
++  }
++
++  QSqlDatabase connection() const
++  {
++    return m_db;
++  }
++
++protected:
++  db_connection()
++    : m_db(QSqlDatabase::addDatabase(u"QSQLITE"_qs))
++  {}
++
++  ~db_connection()
++  {
++    m_db.close();
++  }
++
++private:
++  QSqlDatabase m_db;
++};
++
++
++class peer_logger
++{
++public:
++  explicit peer_logger(QSqlDatabase db, QString table)
++    : m_db(db)
++    , m_table(table)
++  {
++    if (!db.tables().contains(table)) {
++      db.exec(u"CREATE TABLE '%1' ("
++              u"    'id'      INTEGER PRIMARY KEY,"
++              u"    'ip'      TEXT NOT NULL UNIQUE,"
++              u"    'client'  TEXT NOT NULL,"
++              u"    'pid'     BLOB NOT NULL,"
++              u"    'tag'     TEXT"
++              u");"_qs.arg(table));
++      db.commit();
++    }
++  }
++
++  bool log_peer(const lt::peer_info& info, const std::string& tag = {})
++  {
++    QSqlQuery q(m_db);
++    q.prepare(u"INSERT INTO '%1' (ip, client, pid, tag) VALUES (?, ?, ?, ?)"_qs.arg(m_table));
++    q.addBindValue(QString::fromStdString(info.ip.address().to_string()));
++    q.addBindValue(QString::fromStdString(info.client));
++    q.addBindValue(QString::fromLatin1(info.pid.data(), 8));
++    q.addBindValue(QString::fromStdString(tag));
++    return q.exec();
++  }
++
++private:
++  QSqlDatabase m_db;
++  QString m_table;
++};
++
++
++class peer_logger_singleton
++{
++public:
++  static peer_logger_singleton& instance()
++  {
++    static peer_logger_singleton logger;
++    return logger;
++  }
++
++  void log_peer(const lt::peer_info& info, const std::string& tag)
++  {
++    m_logger.log_peer(info, tag);
++  }
++
++protected:
++  peer_logger_singleton()
++    : m_logger(db_connection::instance().connection(), QStringLiteral("banned_peers"))
++  {}
++
++private:
++  peer_logger m_logger;
++};
+diff -ruN a/src/base/bittorrent/session.h b/src/base/bittorrent/session.h
+--- a/src/base/bittorrent/session.h	2023-05-28 07:01:39.000000000 +0800
++++ b/src/base/bittorrent/session.h	2023-05-30 00:23:36.000000000 +0800
+@@ -225,6 +225,21 @@
+         virtual Path finishedTorrentExportDirectory() const = 0;
+         virtual void setFinishedTorrentExportDirectory(const Path &path) = 0;
+ 
++        // Auto ban Unknown Peer
++        virtual bool isAutoBanUnknownPeerEnabled() const = 0;
++        virtual void setAutoBanUnknownPeer(bool value) = 0;
++
++        // Auto ban Bittorrent Media Player Peer
++        virtual bool isAutoBanBTPlayerPeerEnabled() const = 0;
++        virtual void setAutoBanBTPlayerPeer(bool value) = 0;
++
++        // Trackers list
++        virtual bool isAutoUpdateTrackersEnabled() const = 0;
++        virtual void setAutoUpdateTrackersEnabled(bool enabled) = 0;
++        virtual QString publicTrackers() const = 0;
++        virtual void setPublicTrackers(const QString &trackers) = 0;
++        virtual void updatePublicTracker() = 0;
++
+         virtual int globalDownloadSpeedLimit() const = 0;
+         virtual void setGlobalDownloadSpeedLimit(int limit) = 0;
+         virtual int globalUploadSpeedLimit() const = 0;
+@@ -431,6 +446,7 @@
+         void allTorrentsFinished();
+         void categoryAdded(const QString &categoryName);
+         void categoryRemoved(const QString &categoryName);
++        void categoryOptionsChanged(const QString &categoryName);
+         void downloadFromUrlFailed(const QString &url, const QString &reason);
+         void downloadFromUrlFinished(const QString &url);
+         void fullDiskError(Torrent *torrent, const QString &msg);
+diff -ruN a/src/base/bittorrent/sessionimpl.cpp b/src/base/bittorrent/sessionimpl.cpp
+--- a/src/base/bittorrent/sessionimpl.cpp	2023-05-28 07:01:39.000000000 +0800
++++ b/src/base/bittorrent/sessionimpl.cpp	2023-05-30 00:23:36.000000000 +0800
+@@ -1,6 +1,6 @@
+ /*
+  * Bittorrent Client using Qt and libtorrent.
+- * Copyright (C) 2015  Vladimir Golovnev <glassez@yandex.ru>
++ * Copyright (C) 2015-2022  Vladimir Golovnev <glassez@yandex.ru>
+  * Copyright (C) 2006  Christophe Dumez <chris@qbittorrent.org>
+  *
+  * This program is free software; you can redistribute it and/or
+@@ -105,6 +105,8 @@
+ #include "lttypecast.h"
+ #include "magneturi.h"
+ #include "nativesessionextension.h"
++#include "peer_blacklist.hpp"
++#include "peer_filter_session_plugin.hpp"
+ #include "portforwarderimpl.h"
+ #include "resumedatastorage.h"
+ #include "torrentimpl.h"
+@@ -120,7 +122,7 @@
+ namespace
+ {
+     const char PEER_ID[] = "qB";
+-    const auto USER_AGENT = QStringLiteral("qBittorrent/" QBT_VERSION_2);
++    const auto USER_AGENT = QStringLiteral("qBittorrent Enhanced/" QBT_VERSION_2);
+ 
+     void torrentQueuePositionUp(const lt::torrent_handle &handle)
+     {
+@@ -509,6 +511,10 @@
+                         }
+                  )
+     , m_resumeDataStorageType(BITTORRENT_SESSION_KEY(u"ResumeDataStorageType"_qs), ResumeDataStorageType::Legacy)
++    , m_publicTrackers(BITTORRENT_SESSION_KEY(u"PublicTrackersList"_qs))
++    , m_autoBanUnknownPeer(BITTORRENT_SESSION_KEY(u"AutoBanUnknownPeer"_qs), false)
++    , m_autoBanBTPlayerPeer(BITTORRENT_SESSION_KEY(u"AutoBanBTPlayerPeer"_qs), false)
++    , m_isAutoUpdateTrackersEnabled(BITTORRENT_SESSION_KEY(u"AutoUpdateTrackersEnabled"_qs), false)
+     , m_seedingLimitTimer {new QTimer {this}}
+     , m_resumeDataTimer {new QTimer {this}}
+     , m_ioThread {new QThread}
+@@ -546,6 +552,7 @@
+ 
+     updateSeedingLimitTimer();
+     populateAdditionalTrackers();
++    populatePublicTrackers();
+     if (isExcludedFileNamesEnabled())
+         populateExcludedFileNamesRegExpList();
+ 
+@@ -578,6 +585,15 @@
+     enableTracker(isTrackerEnabled());
+ 
+     prepareStartup();
++
++    // Update Tracker
++    m_updateTimer = new QTimer(this);
++    m_updateTimer->setInterval(86400*1000);
++    connect(m_updateTimer, &QTimer::timeout, this, &SessionImpl::updatePublicTracker);
++    if (isAutoUpdateTrackersEnabled()) {
++        updatePublicTracker();
++        m_updateTimer->start();
++    }
+ }
+ 
+ SessionImpl::~SessionImpl()
+@@ -693,6 +709,54 @@
+     return m_isPreallocationEnabled;
+ }
+ 
++bool SessionImpl::isAutoUpdateTrackersEnabled() const
++{
++    return m_isAutoUpdateTrackersEnabled;
++}
++
++void SessionImpl::setAutoUpdateTrackersEnabled(bool enabled)
++{
++    m_isAutoUpdateTrackersEnabled = enabled;
++
++    if(!enabled) {
++        m_updateTimer->stop();
++    } else {
++        m_updateTimer->start();
++        updatePublicTracker();
++    }
++}
++
++QString SessionImpl::publicTrackers() const
++{
++    return m_publicTrackers;
++}
++
++void SessionImpl::setPublicTrackers(const QString &trackers)
++{
++    if (trackers != publicTrackers()) {
++        m_publicTrackers = trackers;
++        populatePublicTrackers();
++    }
++}
++
++void SessionImpl::updatePublicTracker()
++{
++    Preferences *const pref = Preferences::instance();
++    Net::DownloadManager::instance()->download({pref->customizeTrackersListUrl()}, this, &SessionImpl::handlePublicTrackerTxtDownloadFinished);
++}
++
++void SessionImpl::handlePublicTrackerTxtDownloadFinished(const Net::DownloadResult &result)
++{
++    switch (result.status) {
++        case Net::DownloadStatus::Success:
++            setPublicTrackers(QString::fromUtf8(result.data.data()));
++            LogMsg(tr("The public tracker list updated."), Log::INFO);
++            break;
++        default:
++            LogMsg(tr("Updating the public tracker list failed: %1").arg(result.errorString, Log::WARNING));
++    }
++}
++
+ void SessionImpl::setPreallocationEnabled(const bool enabled)
+ {
+     m_isPreallocationEnabled = enabled;
+@@ -828,6 +892,7 @@
+         }
+     }
+ 
++    emit categoryOptionsChanged(name);
+     return true;
+ }
+ 
+@@ -1476,6 +1541,18 @@
+     if (isPeXEnabled())
+         m_nativeSession->add_extension(&lt::create_ut_pex_plugin);
+ 
++    // Enhanced features
++    const Path peersDbPath = specialFolderLocation(SpecialFolder::Data) / Path(u"peers.db"_qs);
++    db_connection::instance().init(peersDbPath.toString());
++    m_nativeSession->add_extension(&create_drop_bad_peers_plugin);
++    if (isAutoBanUnknownPeerEnabled()) {
++        m_nativeSession->add_extension(&create_drop_unknown_peers_plugin);
++        m_nativeSession->add_extension(&create_drop_offline_downloader_plugin);
++    }
++    if (isAutoBanBTPlayerPeerEnabled())
++        m_nativeSession->add_extension(&create_drop_bittorrent_media_player_plugin);
++    m_nativeSession->add_extension(std::make_shared<peer_filter_session_plugin>());
++
+     m_nativeSession->add_extension(std::make_shared<NativeSessionExtension>());
+ }
+ 
+@@ -2004,6 +2081,19 @@
+     }
+ }
+ 
++void SessionImpl::populatePublicTrackers()
++{
++    m_publicTrackerList.clear();
++
++    const QString trackers = publicTrackers();
++    for (QStringView tracker : asConst(QStringView(trackers).split(u'\n')))
++    {
++        tracker = tracker.trimmed();
++        if (!tracker.isEmpty())
++            m_publicTrackerList.append({tracker.toString()});
++    }
++}
++
+ void SessionImpl::processShareLimits()
+ {
+     qDebug("Processing share limits...");
+@@ -2685,6 +2775,17 @@
+         }
+     }
+ 
++    if (isAutoUpdateTrackersEnabled() && !(hasMetadata && p.ti->priv())) {
++        p.trackers.reserve(p.trackers.size() + static_cast<std::size_t>(m_publicTrackerList.size()));
++        p.tracker_tiers.reserve(p.trackers.size() + static_cast<std::size_t>(m_publicTrackerList.size()));
++        p.tracker_tiers.resize(p.trackers.size(), 0);
++        for (const TrackerEntry &trackerEntry : asConst(m_publicTrackerList))
++        {
++            p.trackers.push_back(trackerEntry.url.toStdString());
++            p.tracker_tiers.push_back(trackerEntry.tier);
++        }
++    }
++
+     p.upload_limit = addTorrentParams.uploadLimit;
+     p.download_limit = addTorrentParams.downloadLimit;
+ 
+@@ -4443,6 +4544,32 @@
+     }
+ }
+ 
++bool SessionImpl::isAutoBanUnknownPeerEnabled() const
++{
++    return m_autoBanUnknownPeer;
++}
++
++void SessionImpl::setAutoBanUnknownPeer(bool value)
++{
++    if (value != isAutoBanUnknownPeerEnabled()) {
++        m_autoBanUnknownPeer = value;
++        LogMsg(tr("Restart is required to toggle Auto Ban Unknown Client support"), Log::WARNING);
++    }
++}
++
++bool SessionImpl::isAutoBanBTPlayerPeerEnabled() const
++{
++    return m_autoBanBTPlayerPeer;
++}
++
++void SessionImpl::setAutoBanBTPlayerPeer(bool value)
++{
++    if (value != isAutoBanBTPlayerPeerEnabled()) {
++        m_autoBanBTPlayerPeer = value;
++        LogMsg(tr("Restart is required to toggle Auto Ban Bittorrent Media Player support"), Log::WARNING);
++    }
++}
++
+ bool SessionImpl::isListening() const
+ {
+     return m_nativeSession->is_listening();
+diff -ruN a/src/base/bittorrent/sessionimpl.h b/src/base/bittorrent/sessionimpl.h
+--- a/src/base/bittorrent/sessionimpl.h	2023-05-28 07:01:39.000000000 +0800
++++ b/src/base/bittorrent/sessionimpl.h	2023-05-30 00:23:36.000000000 +0800
+@@ -428,6 +428,21 @@
+         void findIncompleteFiles(const TorrentInfo &torrentInfo, const Path &savePath
+                                  , const Path &downloadPath, const PathList &filePaths = {}) const;
+ 
++        // Auto ban Unknown Peer
++        bool isAutoBanUnknownPeerEnabled() const override;
++        void setAutoBanUnknownPeer(bool value) override;
++
++        // Auto ban Bittorrent Media Player Peer
++        bool isAutoBanBTPlayerPeerEnabled() const override;
++        void setAutoBanBTPlayerPeer(bool value) override;
++
++        // Trackers list
++        bool isAutoUpdateTrackersEnabled() const override;
++        void setAutoUpdateTrackersEnabled(bool enabled) override;
++        QString publicTrackers() const override;
++        void setPublicTrackers(const QString &trackers) override;
++        void updatePublicTracker() override;
++
+     private slots:
+         void configureDeferred();
+         void readAlerts();
+@@ -445,6 +460,9 @@
+         void networkConfigurationChange(const QNetworkConfiguration &);
+ #endif
+ 
++        // Public Tracker handle slots
++        void handlePublicTrackerTxtDownloadFinished(const Net::DownloadResult &result);
++
+     private:
+         struct ResumeSessionContext;
+ 
+@@ -531,6 +549,8 @@
+         void saveTorrentsQueue() const;
+         void removeTorrentsQueue() const;
+ 
++        void populatePublicTrackers();
++
+         std::vector<lt::alert *> getPendingAlerts(lt::time_duration time = lt::time_duration::zero()) const;
+ 
+         void moveTorrentStorage(const MoveStorageJob &job) const;
+@@ -658,6 +678,13 @@
+         CachedSettingValue<QStringList> m_bannedIPs;
+         CachedSettingValue<ResumeDataStorageType> m_resumeDataStorageType;
+ 
++        // Enhanced Function
++        CachedSettingValue<QString> m_publicTrackers;
++        CachedSettingValue<bool> m_autoBanUnknownPeer;
++        CachedSettingValue<bool> m_autoBanBTPlayerPeer;
++        CachedSettingValue<bool> m_isAutoUpdateTrackersEnabled;
++        QTimer *m_updateTimer;
++
+         bool m_isRestored = false;
+ 
+         // Order is important. This needs to be declared after its CachedSettingsValue
+@@ -667,6 +694,7 @@
+ 
+         int m_numResumeData = 0;
+         QVector<TrackerEntry> m_additionalTrackerList;
++        QVector<TrackerEntry> m_publicTrackerList;
+         QVector<QRegularExpression> m_excludedFileNamesRegExpList;
+ 
+         // Statistics
+diff -ruN a/src/base/net/dnsupdater.cpp b/src/base/net/dnsupdater.cpp
+--- a/src/base/net/dnsupdater.cpp	2023-05-28 07:01:39.000000000 +0800
++++ b/src/base/net/dnsupdater.cpp	2023-05-30 00:23:36.000000000 +0800
+@@ -80,7 +80,7 @@
+     Q_ASSERT(m_state == OK);
+ 
+     DownloadManager::instance()->download(
+-                DownloadRequest(u"http://checkip.dyndns.org"_qs).userAgent(QStringLiteral("qBittorrent/" QBT_VERSION_2))
++                DownloadRequest(u"http://checkip.dyndns.org"_qs).userAgent(QStringLiteral("qBittorrent Enhanced/" QBT_VERSION_2))
+                 , this, &DNSUpdater::ipRequestFinished);
+ 
+     m_lastIPCheckTime = QDateTime::currentDateTime();
+@@ -128,7 +128,7 @@
+ 
+     m_lastIPCheckTime = QDateTime::currentDateTime();
+     DownloadManager::instance()->download(
+-                DownloadRequest(getUpdateUrl()).userAgent(QStringLiteral("qBittorrent/" QBT_VERSION_2))
++                DownloadRequest(getUpdateUrl()).userAgent(QStringLiteral("qBittorrent Enhanced/" QBT_VERSION_2))
+                 , this, &DNSUpdater::ipUpdateFinished);
+ }
+ 
+diff -ruN a/src/base/preferences.cpp b/src/base/preferences.cpp
+--- a/src/base/preferences.cpp	2023-05-28 07:01:39.000000000 +0800
++++ b/src/base/preferences.cpp	2023-05-30 00:23:36.000000000 +0800
+@@ -1646,6 +1646,35 @@
+     setValue(u"SpeedWidget/graph_enable_%1"_qs.arg(id), enable);
+ }
+ 
++bool Preferences::getAutoBanUnknownPeer() const
++{
++    return value(u"Preferences/Advanced/AutoBanUnknownPeer"_qs, false);
++}
++
++void Preferences::setAutoBanUnknownPeer(const bool checked)
++{
++    setValue(u"Preferences/Advanced/AutoBanUnknownPeer"_qs, checked);
++}
++
++bool Preferences::getAutoBanBTPlayerPeer() const
++{
++    return value(u"Preferences/Advanced/AutoBanBTPlayerPeer"_qs, false);
++}
++
++void Preferences::setAutoBanBTPlayerPeer(const bool checked)
++{
++    setValue(u"Preferences/Advanced/AutoBanBTPlayerPeer"_qs, checked);
++}
++
++QString Preferences::customizeTrackersListUrl() const
++{
++    return value(u"Preferences/Bittorrent/CustomizeTrackersListUrl"_qs, u"https://cdn.jsdelivr.net/gh/ngosang/trackerslist/trackers_best.txt"_qs);
++}
++
++void Preferences::setCustomizeTrackersListUrl(const QString &trackersUrl) {
++    setValue(u"Preferences/Bittorrent/CustomizeTrackersListUrl"_qs, trackersUrl);
++}
++
+ void Preferences::apply()
+ {
+     if (SettingsStorage::instance()->save())
+diff -ruN a/src/base/preferences.h b/src/base/preferences.h
+--- a/src/base/preferences.h	2023-05-28 07:01:39.000000000 +0800
++++ b/src/base/preferences.h	2023-05-30 00:23:36.000000000 +0800
+@@ -405,6 +405,14 @@
+     bool getSpeedWidgetGraphEnable(int id) const;
+     void setSpeedWidgetGraphEnable(int id, bool enable);
+ 
++    // Enhanced option
++    bool getAutoBanUnknownPeer() const;
++    void setAutoBanUnknownPeer(const bool checked);
++    bool getAutoBanBTPlayerPeer() const;
++    void setAutoBanBTPlayerPeer(const bool checked);
++    QString customizeTrackersListUrl() const;
++    void setCustomizeTrackersListUrl(const QString &trackersUrl);
++
+ public slots:
+     void setStatusFilterState(bool checked);
+     void setCategoryFilterState(bool checked);
+diff -ruN a/src/base/version.h.in b/src/base/version.h.in
+--- a/src/base/version.h.in	2023-05-28 07:01:39.000000000 +0800
++++ b/src/base/version.h.in	2023-05-30 00:23:36.000000000 +0800
+@@ -31,7 +31,7 @@
+ #define QBT_VERSION_MAJOR 4
+ #define QBT_VERSION_MINOR 5
+ #define QBT_VERSION_BUGFIX 3
+-#define QBT_VERSION_BUILD 0
++#define QBT_VERSION_BUILD 10
+ #define QBT_VERSION_STATUS ""  // Should be empty for stable releases!
+ 
+ #define QBT__STRINGIFY(x) #x
+diff -ruN a/src/gui/aboutdialog.cpp b/src/gui/aboutdialog.cpp
+--- a/src/gui/aboutdialog.cpp	2023-05-28 07:01:39.000000000 +0800
++++ b/src/gui/aboutdialog.cpp	2023-05-30 00:23:36.000000000 +0800
+@@ -49,7 +49,7 @@
+     m_ui->setupUi(this);
+ 
+     // Title
+-    m_ui->labelName->setText(QStringLiteral("<b><h2>qBittorrent " QBT_VERSION " (%1-bit)</h2></b>").arg(QT_POINTER_SIZE * 8));
++    m_ui->labelName->setText(QStringLiteral("<b><h2>qBittorrent Enhanced Edition " QBT_VERSION " (%1-bit)</h2></b>").arg(QT_POINTER_SIZE * 8));
+ 
+     m_ui->logo->setPixmap(Utils::Gui::scaledPixmapSvg(UIThemeManager::instance()->getIconPath(u"qbittorrent-tray"_qs), this, 32));
+ 
+@@ -62,6 +62,8 @@
+         u"<tr><td>%3</td><td><a href=\"https://www.qbittorrent.org\">https://www.qbittorrent.org</a></td></tr>"
+         u"<tr><td>%4</td><td><a href=\"http://forum.qbittorrent.org\">http://forum.qbittorrent.org</a></td></tr>"
+         u"<tr><td>%5</td><td><a href=\"http://bugs.qbittorrent.org\">http://bugs.qbittorrent.org</a></td></tr>"
++        u"<tr><td>%6</td><td><a href=\"https://github.com/c0re100/qBittorrent-Enhanced-Edition\">GitHub Repository</a></td></tr>"
++        u"<tr><td>%7</td><td><a href=\"https://t.me/loli_make_the_world_great_again\">Husky</a></td></tr>"
+         u"</table>"
+         u"</p>"_qs
+         .arg(tr("An advanced BitTorrent client programmed in C++, based on Qt toolkit and libtorrent-rasterbar.")
+@@ -69,7 +71,10 @@
+             , tr("Copyright %1 2006-2022 The qBittorrent project").arg(C_COPYRIGHT)
+             , tr("Home Page:")
+             , tr("Forum:")
+-            , tr("Bug Tracker:"));
++            , tr("Bug Tracker:")
++            , tr("Bug Tracker:")
++            , tr("Enhanced Edition:")
++            , tr("Maintainer:"));
+     m_ui->labelAbout->setText(aboutText);
+ 
+     m_ui->labelMascot->setPixmap(Utils::Gui::scaledPixmap(Path(u":/icons/mascot.png"_qs), this));
+diff -ruN a/src/gui/advancedsettings.cpp b/src/gui/advancedsettings.cpp
+--- a/src/gui/advancedsettings.cpp	2023-05-28 07:01:39.000000000 +0800
++++ b/src/gui/advancedsettings.cpp	2023-05-30 00:23:36.000000000 +0800
+@@ -77,6 +77,8 @@
+         SAVE_RESUME_DATA_INTERVAL,
+         CONFIRM_RECHECK_TORRENT,
+         RECHECK_COMPLETED,
++        CONFIRM_AUTO_BAN_UNKNOWN_PEER,
++        CONFIRM_AUTO_BAN_BT_Player,
+         // UI related
+         LIST_REFRESH,
+         RESOLVE_HOSTS,
+@@ -275,6 +277,10 @@
+     session->setMaxConcurrentHTTPAnnounces(m_spinBoxMaxConcurrentHTTPAnnounces.value());
+     // Stop tracker timeout
+     session->setStopTrackerTimeout(m_spinBoxStopTrackerTimeout.value());
++    // Auto ban Unknown Peer
++    session->setAutoBanUnknownPeer(m_autoBanUnknownPeer.isChecked());
++    // Auto ban Bittorrent Media Player Peer
++    session->setAutoBanBTPlayerPeer(m_autoBanBTPlayerPeer.isChecked());
+     // Program notification
+     app()->desktopIntegration()->setNotificationsEnabled(m_checkBoxProgramNotifications.isChecked());
+ #ifdef QBT_USES_CUSTOMDBUSNOTIFICATIONS
+@@ -683,6 +689,12 @@
+     addRow(ANNOUNCE_IP, (tr("IP address reported to trackers (requires restart)")
+         + u' ' + makeLink(u"https://www.libtorrent.org/reference-Settings.html#announce_ip", u"(?)"))
+         , &m_lineEditAnnounceIP);
++    // Auto Ban Unknown Peer from China
++    m_autoBanUnknownPeer.setChecked(session->isAutoBanUnknownPeerEnabled());
++    addRow(CONFIRM_AUTO_BAN_UNKNOWN_PEER, tr("Auto Ban Unknown Peer from China"), &m_autoBanUnknownPeer);
++    // Auto Ban Bittorrent Media Player Peer
++    m_autoBanBTPlayerPeer.setChecked(session->isAutoBanBTPlayerPeerEnabled());
++    addRow(CONFIRM_AUTO_BAN_BT_Player, tr("Auto Ban Bittorrent Media Player Peer"), &m_autoBanBTPlayerPeer);
+     // Max concurrent HTTP announces
+     m_spinBoxMaxConcurrentHTTPAnnounces.setMaximum(std::numeric_limits<int>::max());
+     m_spinBoxMaxConcurrentHTTPAnnounces.setValue(session->maxConcurrentHTTPAnnounces());
+diff -ruN a/src/gui/advancedsettings.h b/src/gui/advancedsettings.h
+--- a/src/gui/advancedsettings.h	2023-05-28 07:01:39.000000000 +0800
++++ b/src/gui/advancedsettings.h	2023-05-30 00:23:36.000000000 +0800
+@@ -70,7 +70,7 @@
+               m_checkBoxProgramNotifications, m_checkBoxTorrentAddedNotifications, m_checkBoxReannounceWhenAddressChanged, m_checkBoxTrackerFavicon, m_checkBoxTrackerStatus,
+               m_checkBoxTrackerPortForwarding, m_checkBoxConfirmTorrentRecheck, m_checkBoxConfirmRemoveAllTags, m_checkBoxAnnounceAllTrackers, m_checkBoxAnnounceAllTiers,
+               m_checkBoxMultiConnectionsPerIp, m_checkBoxValidateHTTPSTrackerCertificate, m_checkBoxSSRFMitigation, m_checkBoxBlockPeersOnPrivilegedPorts, m_checkBoxPieceExtentAffinity,
+-              m_checkBoxSuggestMode, m_checkBoxSpeedWidgetEnabled, m_checkBoxIDNSupport;
++              m_checkBoxSuggestMode, m_checkBoxSpeedWidgetEnabled, m_checkBoxIDNSupport, m_autoBanUnknownPeer, m_autoBanBTPlayerPeer;
+     QComboBox m_comboBoxInterface, m_comboBoxInterfaceAddress, m_comboBoxDiskIOReadMode, m_comboBoxDiskIOWriteMode, m_comboBoxUtpMixedMode, m_comboBoxChokingAlgorithm,
+               m_comboBoxSeedChokingAlgorithm, m_comboBoxResumeDataStorage;
+     QLineEdit m_lineEditAnnounceIP;
+diff -ruN a/src/gui/mainwindow.cpp b/src/gui/mainwindow.cpp
+--- a/src/gui/mainwindow.cpp	2023-05-28 07:01:39.000000000 +0800
++++ b/src/gui/mainwindow.cpp	2023-05-30 00:23:36.000000000 +0800
+@@ -1526,7 +1526,7 @@
+ 
+     if (m_displaySpeedInTitle)
+     {
+-        setWindowTitle(tr("[D: %1, U: %2] qBittorrent %3", "D = Download; U = Upload; %3 is qBittorrent version")
++        setWindowTitle(tr("[D: %1, U: %2] qBittorrent Enhanced Edition %3", "D = Download; U = Upload; %3 is qBittorrent version")
+             .arg(Utils::Misc::friendlyUnit(status.payloadDownloadRate, true)
+                 , Utils::Misc::friendlyUnit(status.payloadUploadRate, true)
+                 , QStringLiteral(QBT_VERSION)));
+@@ -1655,7 +1655,7 @@
+     if (m_displaySpeedInTitle)
+         reloadSessionStats();
+     else
+-        setWindowTitle(QStringLiteral("qBittorrent " QBT_VERSION));
++        setWindowTitle(QStringLiteral("qBittorrent Enhanced Edition " QBT_VERSION));
+ }
+ 
+ void MainWindow::on_actionRSSReader_triggered()
+@@ -1754,8 +1754,9 @@
+     const QString newVersion = updater->getNewVersion();
+     if (!newVersion.isEmpty())
+     {
++        const QString content = updater->getNewContent();
+         const QString msg {tr("A new version is available.") + u"<br/>"
+-            + tr("Do you want to download %1?").arg(newVersion) + u"<br/><br/>"
++            + tr("Do you want to download %1?%2").arg(newVersion).arg(content) + u"<br/><br/>"
+             + u"<a href=\"https://www.qbittorrent.org/news.php\">%1</a>"_qs.arg(tr("Open changelog..."))};
+         auto *msgBox = new QMessageBox {QMessageBox::Question, tr("qBittorrent Update Available"), msg
+             , (QMessageBox::Yes | QMessageBox::No), this};
+@@ -1777,8 +1778,9 @@
+     {
+         if (invokedByUser)
+         {
++            const QString nextUpdate = updater->getNextUpdate();
+             auto *msgBox = new QMessageBox {QMessageBox::Information, u"qBittorrent"_qs
+-                , tr("No updates available.\nYou are already using the latest version.")
++                , tr("No updates available.\nYou are already using the latest version.\n\n%1").arg(nextUpdate)
+                 , QMessageBox::Ok, this};
+             msgBox->setAttribute(Qt::WA_DeleteOnClose);
+             msgBox->setWindowModality(Qt::NonModal);
+diff -ruN a/src/gui/optionsdialog.cpp b/src/gui/optionsdialog.cpp
+--- a/src/gui/optionsdialog.cpp	2023-05-28 07:01:39.000000000 +0800
++++ b/src/gui/optionsdialog.cpp	2023-05-30 00:23:36.000000000 +0800
+@@ -44,6 +44,7 @@
+ #include "base/bittorrent/session.h"
+ #include "base/exceptions.h"
+ #include "base/global.h"
++#include "base/net/downloadmanager.h"
+ #include "base/net/portforwarder.h"
+ #include "base/net/proxyconfigurationmanager.h"
+ #include "base/path.h"
+@@ -944,6 +945,7 @@
+ void OptionsDialog::loadBittorrentTabOptions()
+ {
+     const auto *session = BitTorrent::Session::instance();
++    const auto *pref = Preferences::instance();
+ 
+     m_ui->checkDHT->setChecked(session->isDHTEnabled());
+     m_ui->checkPeX->setChecked(session->isPeXEnabled());
+@@ -1006,9 +1008,14 @@
+         {EnableSuperSeeding, 3}
+     };
+     m_ui->comboRatioLimitAct->setCurrentIndex(actIndex.value(session->maxRatioAction()));
++    m_ui->checkAutoUpdateTrackers->setChecked(session->isAutoUpdateTrackersEnabled());
++    m_ui->textCustomizeTrackersListUrl->setText(pref->customizeTrackersListUrl());
++    m_ui->textPublicTrackers->setPlainText(session->publicTrackers());
+ 
+     m_ui->checkEnableAddTrackers->setChecked(session->isAddTrackersEnabled());
+     m_ui->textTrackers->setPlainText(session->additionalTrackers());
++    connect(m_ui->checkAutoUpdateTrackers, &QGroupBox::toggled, this, &ThisType::enableApplyButton);
++    connect(m_ui->textCustomizeTrackersListUrl, &QLineEdit::textChanged, this, &ThisType::enableApplyButton);
+ 
+     connect(m_ui->checkDHT, &QAbstractButton::toggled, this, &ThisType::enableApplyButton);
+     connect(m_ui->checkPeX, &QAbstractButton::toggled, this, &ThisType::enableApplyButton);
+@@ -1042,6 +1049,7 @@
+ void OptionsDialog::saveBittorrentTabOptions() const
+ {
+     auto *session = BitTorrent::Session::instance();
++    auto *pref = Preferences::instance();
+ 
+     session->setDHTEnabled(isDHTEnabled());
+     session->setPeXEnabled(m_ui->checkPeX->isChecked());
+@@ -1070,6 +1078,8 @@
+         EnableSuperSeeding
+     };
+     session->setMaxRatioAction(actIndex.value(m_ui->comboRatioLimitAct->currentIndex()));
++    session->setAutoUpdateTrackersEnabled(m_ui->checkAutoUpdateTrackers->isChecked());
++    pref->setCustomizeTrackersListUrl(m_ui->textCustomizeTrackersListUrl->text());
+ 
+     session->setAddTrackersEnabled(m_ui->checkEnableAddTrackers->isChecked());
+     session->setAdditionalTrackers(m_ui->textTrackers->toPlainText());
+@@ -1904,3 +1914,23 @@
+     connect(dialog, &QDialog::accepted, this, &OptionsDialog::enableApplyButton);
+     dialog->open();
+ }
++
++void OptionsDialog::on_fetchButton_clicked()
++{
++    Net::DownloadHandler *m_fetchHandler = Net::DownloadManager::instance()->download(Preferences::instance()->customizeTrackersListUrl());
++    connect(m_fetchHandler, &Net::DownloadHandler::finished, this, &OptionsDialog::handlePublicTrackersListChanged);
++}
++
++void OptionsDialog::handlePublicTrackersListChanged(const Net::DownloadResult &result)
++{
++    switch (result.status) {
++        case Net::DownloadStatus::Success:
++            BitTorrent::Session::instance()->setPublicTrackers(QString::fromUtf8(result.data.data()));
++            m_ui->textPublicTrackers->setPlainText(QString::fromUtf8(result.data.data()));
++            m_ui->fetchButton->setEnabled(false);
++            m_ui->fetchButton->setText(u"Fetched!"_qs);
++            break;
++        default:
++            m_ui->textPublicTrackers->setPlainText(u"Refetch failed. Reason: "_qs + result.errorString);
++    }
++}
+diff -ruN a/src/gui/optionsdialog.h b/src/gui/optionsdialog.h
+--- a/src/gui/optionsdialog.h	2023-05-28 07:01:39.000000000 +0800
++++ b/src/gui/optionsdialog.h	2023-05-30 00:23:36.000000000 +0800
+@@ -32,6 +32,7 @@
+ 
+ #include "base/pathfwd.h"
+ #include "base/settingvalue.h"
++#include "base/net/downloadmanager.h"
+ #include "guiapplicationcomponent.h"
+ 
+ class QListWidgetItem;
+@@ -109,6 +110,8 @@
+     void webUIHttpsCertChanged(const Path &path);
+     void webUIHttpsKeyChanged(const Path &path);
+     void on_registerDNSBtn_clicked();
++    void on_fetchButton_clicked();
++    void handlePublicTrackersListChanged(const Net::DownloadResult &result);
+ #endif
+ 
+ private:
+diff -ruN a/src/gui/optionsdialog.ui b/src/gui/optionsdialog.ui
+--- a/src/gui/optionsdialog.ui	2023-05-28 07:01:39.000000000 +0800
++++ b/src/gui/optionsdialog.ui	2023-05-30 00:23:36.000000000 +0800
+@@ -122,8 +122,8 @@
+             <rect>
+              <x>0</x>
+              <y>0</y>
+-             <width>501</width>
+-             <height>893</height>
++             <width>470</width>
++             <height>909</height>
+             </rect>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_9">
+@@ -757,8 +757,8 @@
+             <rect>
+              <x>0</x>
+              <y>0</y>
+-             <width>591</width>
+-             <height>1138</height>
++             <width>470</width>
++             <height>1066</height>
+             </rect>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout">
+@@ -1534,8 +1534,8 @@
+             <rect>
+              <x>0</x>
+              <y>0</y>
+-             <width>501</width>
+-             <height>745</height>
++             <width>470</width>
++             <height>624</height>
+             </rect>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_20">
+@@ -2025,8 +2025,8 @@
+             <rect>
+              <x>0</x>
+              <y>0</y>
+-             <width>516</width>
+-             <height>525</height>
++             <width>487</width>
++             <height>542</height>
+             </rect>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_5">
+@@ -2361,9 +2361,9 @@
+            <property name="geometry">
+             <rect>
+              <x>0</x>
+-             <y>0</y>
+-             <width>513</width>
+-             <height>679</height>
++             <y>-298</y>
++             <width>470</width>
++             <height>840</height>
+             </rect>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_7">
+@@ -2840,6 +2840,72 @@
+              </widget>
+             </item>
+             <item>
++             <widget class="QGroupBox" name="checkAutoUpdateTrackers">
++              <property name="title">
++               <string>Automatically update public trackers list:</string>
++              </property>
++              <property name="checkable">
++               <bool>true</bool>
++              </property>
++              <property name="checked">
++               <bool>false</bool>
++              </property>
++              <layout class="QGridLayout" name="gridLayout_999">
++               <property name="leftMargin">
++                <number>9</number>
++               </property>
++               <property name="topMargin">
++                <number>9</number>
++               </property>
++               <property name="rightMargin">
++                <number>9</number>
++               </property>
++               <property name="bottomMargin">
++                <number>9</number>
++               </property>
++               <item row="0" column="0">
++                <widget class="QLineEdit" name="textCustomizeTrackersListUrl">
++                 <property name="enabled">
++                  <bool>true</bool>
++                 </property>
++                 <property name="text">
++                  <string>https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt</string>
++                 </property>
++                 <property name="readOnly">
++                  <bool>false</bool>
++                 </property>
++                 <property name="cursorMoveStyle">
++                  <enum>Qt::LogicalMoveStyle</enum>
++                 </property>
++                </widget>
++               </item>
++               <item row="0" column="1">
++                <widget class="QPushButton" name="fetchButton">
++                 <property name="text">
++                  <string>Refetch</string>
++                 </property>
++                </widget>
++               </item>
++               <item row="1" column="0" colspan="2">
++                <widget class="QPlainTextEdit" name="textPublicTrackers">
++                 <property name="enabled">
++                  <bool>true</bool>
++                 </property>
++                 <property name="minimumSize">
++                  <size>
++                   <width>0</width>
++                   <height>153</height>
++                  </size>
++                 </property>
++                 <property name="readOnly">
++                  <bool>true</bool>
++                 </property>
++                </widget>
++               </item>
++              </layout>
++             </widget>
++            </item>
++            <item>
+              <spacer name="verticalSpacer_8">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+@@ -2882,8 +2948,8 @@
+             <rect>
+              <x>0</x>
+              <y>0</y>
+-             <width>516</width>
+-             <height>525</height>
++             <width>487</width>
++             <height>542</height>
+             </rect>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_27">
+@@ -3052,8 +3118,8 @@
+             <rect>
+              <x>0</x>
+              <y>0</y>
+-             <width>501</width>
+-             <height>636</height>
++             <width>470</width>
++             <height>903</height>
+             </rect>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_23">
+diff -ruN a/src/gui/programupdater.cpp b/src/gui/programupdater.cpp
+--- a/src/gui/programupdater.cpp	2023-05-28 07:01:39.000000000 +0800
++++ b/src/gui/programupdater.cpp	2023-05-30 00:23:36.000000000 +0800
+@@ -72,11 +72,11 @@
+ 
+ void ProgramUpdater::checkForUpdates() const
+ {
+-    const auto RSS_URL = u"https://www.fosshub.com/feed/5b8793a7f9ee5a5c3e97a3b2.xml"_qs;
++    const auto RSS_URL = u"https://husky.moe/feedqBittorent.xml"_qs;
+     // Don't change this User-Agent. In case our updater goes haywire,
+     // the filehost can identify it and contact us.
+     Net::DownloadManager::instance()->download(
+-        Net::DownloadRequest(RSS_URL).userAgent(QStringLiteral("qBittorrent/" QBT_VERSION_2 " ProgramUpdater (www.qbittorrent.org)"))
++        Net::DownloadRequest(RSS_URL).userAgent(QStringLiteral("qBittorrent Enhanced/" QBT_VERSION_2 " ProgramUpdater (git.io/qbit)"))
+         , this, &ProgramUpdater::rssDownloadFinished);
+ }
+ 
+@@ -85,6 +85,16 @@
+     return m_newVersion;
+ }
+ 
++QString ProgramUpdater::getNewContent() const
++{
++  return m_content;
++}
++
++QString ProgramUpdater::getNextUpdate() const
++{
++  return m_nextUpdate;
++}
++
+ void ProgramUpdater::rssDownloadFinished(const Net::DownloadResult &result)
+ {
+     if (result.status != Net::DownloadStatus::Success)
+@@ -114,6 +124,8 @@
+ 
+     bool inItem = false;
+     QString version;
++    QString content;
++    QString nextUpdate;
+     QString updateLink;
+     QString type;
+     QXmlStreamReader xml(result.data);
+@@ -132,6 +144,10 @@
+                 type = getStringValue(xml);
+             else if (inItem && (xml.name() == u"version"))
+                 version = getStringValue(xml);
++            else if (inItem && (xml.name() == u"content"))
++                content = getStringValue(xml);
++            else if (inItem && (xml.name() == u"update"))
++                nextUpdate = getStringValue(xml);
+         }
+         else if (xml.isEndElement())
+         {
+@@ -147,7 +163,9 @@
+                         {
+                             m_newVersion = version;
+                             m_updateURL = updateLink;
++                            m_content = content;
+                         }
++                        m_nextUpdate = nextUpdate;
+                     }
+                     break;
+                 }
+@@ -156,6 +174,8 @@
+                 updateLink.clear();
+                 type.clear();
+                 version.clear();
++                content.clear();
++                nextUpdate.clear();
+             }
+         }
+     }
+diff -ruN a/src/gui/programupdater.h b/src/gui/programupdater.h
+--- a/src/gui/programupdater.h	2023-05-28 07:01:39.000000000 +0800
++++ b/src/gui/programupdater.h	2023-05-30 00:23:36.000000000 +0800
+@@ -48,6 +48,8 @@
+ 
+     void checkForUpdates() const;
+     QString getNewVersion() const;
++    QString getNewContent() const;
++    QString getNextUpdate() const;
+     bool updateProgram() const;
+ 
+ signals:
+@@ -58,5 +60,7 @@
+ 
+ private:
+     QString m_newVersion;
++    QString m_nextUpdate;
++    QString m_content;
+     QUrl m_updateURL;
+ };
+diff -ruN a/src/gui/properties/peerlistwidget.cpp b/src/gui/properties/peerlistwidget.cpp
+--- a/src/gui/properties/peerlistwidget.cpp	2023-05-28 07:01:39.000000000 +0800
++++ b/src/gui/properties/peerlistwidget.cpp	2023-05-30 00:23:36.000000000 +0800
+@@ -327,14 +327,28 @@
+     // Store selected rows first as selected peers may disconnect
+     const QModelIndexList selectedIndexes = selectionModel()->selectedRows();
+ 
+-    QVector<QString> selectedIPs;
+-    selectedIPs.reserve(selectedIndexes.size());
++    struct selectedData {
++      QString ip;
++      QString client;
++      QString peerId;
++      QString country;
++    };
++
++    QVector<selectedData> selectedDatas;
++    selectedDatas.reserve(selectedIndexes.size());
+ 
+     for (const QModelIndex &index : selectedIndexes)
+     {
+         const int row = m_proxyModel->mapToSource(index).row();
+         const QString ip = m_listModel->item(row, PeerListColumns::IP_HIDDEN)->text();
+-        selectedIPs += ip;
++        const QString client = m_listModel->item(row, PeerListColumns::CLIENT)->text();
++        const QString peerId = m_listModel->item(row, PeerListColumns::PEERID_CLIENT)->text();
++
++        QHostAddress host(ip);
++        const QString country = Net::GeoIPManager::CountryName(Net::GeoIPManager::instance()->lookup(host));
++
++        selectedData tmp{ip, client, peerId, country};
++        selectedDatas += tmp;
+     }
+ 
+     // Confirm before banning peer
+@@ -342,10 +356,10 @@
+         , tr("Are you sure you want to permanently ban the selected peers?"));
+     if (btn != QMessageBox::Yes) return;
+ 
+-    for (const QString &ip : selectedIPs)
++    for (const selectedData &data : selectedDatas)
+     {
+-        BitTorrent::Session::instance()->banIP(ip);
+-        LogMsg(tr("Peer \"%1\" is manually banned").arg(ip));
++        BitTorrent::Session::instance()->banIP(data.ip);
++        LogMsg(tr("Peer \"%1\" is manually banned. PeerID: '%2' Client: '%3' Country: '%4'").arg(data.ip).arg(data.peerId).arg(data.client).arg(data.country));
+     }
+     // Refresh list
+     loadPeers(m_properties->getCurrentTorrent());
+diff -ruN a/src/webui/api/appcontroller.cpp b/src/webui/api/appcontroller.cpp
+--- a/src/webui/api/appcontroller.cpp	2023-05-28 07:01:39.000000000 +0800
++++ b/src/webui/api/appcontroller.cpp	2023-05-30 00:23:36.000000000 +0800
+@@ -107,6 +107,19 @@
+ 
+     QJsonObject data;
+ 
++    // Behavior
++    // Language
++    data[u"locale"_qs] = pref->getLocale();
++    data[u"performance_warning"_qs] = session->isPerformanceWarningEnabled();
++    // Log file
++    data[u"file_log_enabled"_qs] = app()->isFileLoggerEnabled();
++    data[u"file_log_path"_qs] = app()->fileLoggerPath().toString();
++    data[u"file_log_backup_enabled"_qs] = app()->isFileLoggerBackup();
++    data[u"file_log_max_size"_qs] = app()->fileLoggerMaxSize() / 1024;
++    data[u"file_log_delete_old"_qs] = app()->isFileLoggerDeleteOld();
++    data[u"file_log_age"_qs] = app()->fileLoggerAge();
++    data[u"file_log_age_type"_qs] = app()->fileLoggerAgeType();
++
+     // Downloads
+     // When adding a torrent
+     data[u"torrent_content_layout"_qs] = Utils::String::fromEnum(session->torrentContentLayout());
+@@ -196,6 +209,8 @@
+     data[u"ip_filter_path"_qs] = session->IPFilterFile().toString();
+     data[u"ip_filter_trackers"_qs] = session->isTrackerFilteringEnabled();
+     data[u"banned_IPs"_qs] = session->bannedIPs().join(u'\n');
++    data[u"auto_ban_unknown_peer"_qs] = session->isAutoBanUnknownPeerEnabled();
++    data[u"auto_ban_bt_player_peer"_qs] = session->isAutoBanBTPlayerPeerEnabled();
+ 
+     // Speed
+     // Global Rate Limits
+@@ -244,11 +259,11 @@
+     // Add trackers
+     data[u"add_trackers_enabled"_qs] = session->isAddTrackersEnabled();
+     data[u"add_trackers"_qs] = session->additionalTrackers();
++    data[u"auto_update_trackers_enabled"_qs] = session->isAutoUpdateTrackersEnabled();
++    data[u"customize_trackers_list_url"_qs] = pref->customizeTrackersListUrl();
++    data[u"public_trackers"_qs] = session->publicTrackers();
+ 
+     // Web UI
+-    // Language
+-    data[u"locale"_qs] = pref->getLocale();
+-    data[u"performance_warning"_qs] = session->isPerformanceWarningEnabled();
+     // HTTP Server
+     data[u"web_ui_domain_list"_qs] = pref->getServerDomains();
+     data[u"web_ui_address"_qs] = pref->getWebUiAddress();
+@@ -410,6 +425,45 @@
+         return (it != m.constEnd());
+     };
+ 
++    // Behavior
++    // Language
++    if (hasKey(u"locale"_qs))
++    {
++        QString locale = it.value().toString();
++        if (pref->getLocale() != locale)
++        {
++            auto *translator = new QTranslator;
++            if (translator->load(u":/lang/qbittorrent_"_qs + locale))
++            {
++                qDebug("%s locale recognized, using translation.", qUtf8Printable(locale));
++            }
++            else
++            {
++                qDebug("%s locale unrecognized, using default (en).", qUtf8Printable(locale));
++            }
++            qApp->installTranslator(translator);
++
++            pref->setLocale(locale);
++        }
++    }
++    if (hasKey(u"performance_warning"_qs))
++        session->setPerformanceWarningEnabled(it.value().toBool());
++    // Log file
++    if (hasKey(u"file_log_enabled"_qs))
++        app()->setFileLoggerEnabled(it.value().toBool());
++    if (hasKey(u"file_log_path"_qs))
++        app()->setFileLoggerPath(Path(it.value().toString()));
++    if (hasKey(u"file_log_backup_enabled"_qs))
++        app()->setFileLoggerBackup(it.value().toBool());
++    if (hasKey(u"file_log_max_size"_qs))
++        app()->setFileLoggerMaxSize(it.value().toInt() * 1024);
++    if (hasKey(u"file_log_delete_old"_qs))
++        app()->setFileLoggerDeleteOld(it.value().toBool());
++    if (hasKey(u"file_log_age"_qs))
++        app()->setFileLoggerAge(it.value().toInt());
++    if (hasKey(u"file_log_age_type"_qs))
++        app()->setFileLoggerAgeType(it.value().toInt());
++
+     // Downloads
+     // When adding a torrent
+     if (hasKey(u"torrent_content_layout"_qs))
+@@ -585,6 +639,10 @@
+         session->setTrackerFilteringEnabled(it.value().toBool());
+     if (hasKey(u"banned_IPs"_qs))
+         session->setBannedIPs(it.value().toString().split(u'\n', Qt::SkipEmptyParts));
++    if (hasKey(u"auto_ban_unknown_peer"_qs))
++        session->setAutoBanUnknownPeer(it.value().toBool());
++    if (hasKey(u"auto_ban_bt_player_peer"_qs))
++        session->setAutoBanBTPlayerPeer(it.value().toBool());
+ 
+     // Speed
+     // Global Rate Limits
+@@ -668,30 +726,12 @@
+         session->setAddTrackersEnabled(it.value().toBool());
+     if (hasKey(u"add_trackers"_qs))
+         session->setAdditionalTrackers(it.value().toString());
++    if (hasKey(u"auto_update_trackers_enabled"_qs))
++        session->setAutoUpdateTrackersEnabled(it.value().toBool());
++    if (hasKey(u"customize_trackers_list_url"_qs))
++        pref->setCustomizeTrackersListUrl(it.value().toString());
+ 
+     // Web UI
+-    // Language
+-    if (hasKey(u"locale"_qs))
+-    {
+-        QString locale = it.value().toString();
+-        if (pref->getLocale() != locale)
+-        {
+-            auto *translator = new QTranslator;
+-            if (translator->load(u":/lang/qbittorrent_"_qs + locale))
+-            {
+-                qDebug("%s locale recognized, using translation.", qUtf8Printable(locale));
+-            }
+-            else
+-            {
+-                qDebug("%s locale unrecognized, using default (en).", qUtf8Printable(locale));
+-            }
+-            qApp->installTranslator(translator);
+-
+-            pref->setLocale(locale);
+-        }
+-    }
+-    if (hasKey(u"performance_warning"_qs))
+-        session->setPerformanceWarningEnabled(it.value().toBool());
+     // HTTP Server
+     if (hasKey(u"web_ui_domain_list"_qs))
+         pref->setServerDomains(it.value().toString());
+diff -ruN a/src/webui/api/synccontroller.cpp b/src/webui/api/synccontroller.cpp
+--- a/src/webui/api/synccontroller.cpp	2023-05-28 07:01:39.000000000 +0800
++++ b/src/webui/api/synccontroller.cpp	2023-05-30 00:23:36.000000000 +0800
+@@ -1,6 +1,6 @@
+ /*
+  * Bittorrent Client using Qt and libtorrent.
+- * Copyright (C) 2018  Vladimir Golovnev <glassez@yandex.ru>
++ * Copyright (C) 2018-2023  Vladimir Golovnev <glassez@yandex.ru>
+  *
+  * This program is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU General Public License
+@@ -30,10 +30,12 @@
+ 
+ #include <algorithm>
+ 
++#include <QJsonArray>
+ #include <QJsonObject>
+ #include <QMetaObject>
+ #include <QThreadPool>
+ 
++#include "base/algorithm.h"
+ #include "base/bittorrent/cachestatus.h"
+ #include "base/bittorrent/infohash.h"
+ #include "base/bittorrent/peeraddress.h"
+@@ -106,14 +108,24 @@
+     const QString KEY_TRANSFER_TOTAL_WASTE_SESSION = u"total_wasted_session"_qs;
+     const QString KEY_TRANSFER_WRITE_CACHE_OVERLOAD = u"write_cache_overload"_qs;
+ 
++    const QString KEY_SUFFIX_REMOVED = u"_removed"_qs;
++
++    const QString KEY_CATEGORIES = u"categories"_qs;
++    const QString KEY_CATEGORIES_REMOVED = KEY_CATEGORIES + KEY_SUFFIX_REMOVED;
++    const QString KEY_TAGS = u"tags"_qs;
++    const QString KEY_TAGS_REMOVED = KEY_TAGS + KEY_SUFFIX_REMOVED;
++    const QString KEY_TORRENTS = u"torrents"_qs;
++    const QString KEY_TORRENTS_REMOVED = KEY_TORRENTS + KEY_SUFFIX_REMOVED;
++    const QString KEY_TRACKERS = u"trackers"_qs;
++    const QString KEY_TRACKERS_REMOVED = KEY_TRACKERS + KEY_SUFFIX_REMOVED;
++    const QString KEY_SERVER_STATE = u"server_state"_qs;
+     const QString KEY_FULL_UPDATE = u"full_update"_qs;
+     const QString KEY_RESPONSE_ID = u"rid"_qs;
+-    const QString KEY_SUFFIX_REMOVED = u"_removed"_qs;
+ 
+     void processMap(const QVariantMap &prevData, const QVariantMap &data, QVariantMap &syncData);
+     void processHash(QVariantHash prevData, const QVariantHash &data, QVariantMap &syncData, QVariantList &removedItems);
+     void processList(QVariantList prevData, const QVariantList &data, QVariantList &syncData, QVariantList &removedItems);
+-    QVariantMap generateSyncData(int acceptedResponseId, const QVariantMap &data, QVariantMap &lastAcceptedData, QVariantMap &lastData);
++    QJsonObject generateSyncData(int acceptedResponseId, const QVariantMap &data, QVariantMap &lastAcceptedData, QVariantMap &lastData);
+ 
+     QVariantMap getTransferInfo()
+     {
+@@ -332,23 +344,19 @@
+         }
+     }
+ 
+-    QVariantMap generateSyncData(int acceptedResponseId, const QVariantMap &data, QVariantMap &lastAcceptedData, QVariantMap &lastData)
++    QJsonObject generateSyncData(int acceptedResponseId, const QVariantMap &data, QVariantMap &lastAcceptedData, QVariantMap &lastData)
+     {
+         QVariantMap syncData;
+         bool fullUpdate = true;
+-        int lastResponseId = 0;
+-        if (acceptedResponseId > 0)
++        const int lastResponseId = (acceptedResponseId > 0) ? lastData[KEY_RESPONSE_ID].toInt() : 0;
++        if (lastResponseId > 0)
+         {
+-            lastResponseId = lastData[KEY_RESPONSE_ID].toInt();
+-
+             if (lastResponseId == acceptedResponseId)
+                 lastAcceptedData = lastData;
+ 
+-            int lastAcceptedResponseId = lastAcceptedData[KEY_RESPONSE_ID].toInt();
+-
+-            if (lastAcceptedResponseId == acceptedResponseId)
++            if (const int lastAcceptedResponseId = lastAcceptedData[KEY_RESPONSE_ID].toInt()
++                    ; lastAcceptedResponseId == acceptedResponseId)
+             {
+-                processMap(lastAcceptedData, data, syncData);
+                 fullUpdate = false;
+             }
+         }
+@@ -359,13 +367,17 @@
+             syncData = data;
+             syncData[KEY_FULL_UPDATE] = true;
+         }
++        else
++        {
++            processMap(lastAcceptedData, data, syncData);
++        }
+ 
+-        lastResponseId = (lastResponseId % 1000000) + 1;  // cycle between 1 and 1000000
++        const int responseId = (lastResponseId % 1000000) + 1;  // cycle between 1 and 1000000
+         lastData = data;
+-        lastData[KEY_RESPONSE_ID] = lastResponseId;
+-        syncData[KEY_RESPONSE_ID] = lastResponseId;
++        lastData[KEY_RESPONSE_ID] = responseId;
++        syncData[KEY_RESPONSE_ID] = responseId;
+ 
+-        return syncData;
++        return QJsonObject::fromVariantMap(syncData);
+     }
+ }
+ 
+@@ -441,49 +453,74 @@
+ //   - rid (int): last response id
+ void SyncController::maindataAction()
+ {
+-    const auto *session = BitTorrent::Session::instance();
++    if (m_maindataAcceptedID < 0)
++    {
++        makeMaindataSnapshot();
+ 
+-    QVariantMap data;
++        const auto *btSession = BitTorrent::Session::instance();
++        connect(btSession, &BitTorrent::Session::categoryAdded, this, &SyncController::onCategoryAdded);
++        connect(btSession, &BitTorrent::Session::categoryRemoved, this, &SyncController::onCategoryRemoved);
++        connect(btSession, &BitTorrent::Session::categoryOptionsChanged, this, &SyncController::onCategoryOptionsChanged);
++        connect(btSession, &BitTorrent::Session::subcategoriesSupportChanged, this, &SyncController::onSubcategoriesSupportChanged);
++        connect(btSession, &BitTorrent::Session::tagAdded, this, &SyncController::onTagAdded);
++        connect(btSession, &BitTorrent::Session::tagRemoved, this, &SyncController::onTagRemoved);
++        connect(btSession, &BitTorrent::Session::torrentAdded, this, &SyncController::onTorrentAdded);
++        connect(btSession, &BitTorrent::Session::torrentAboutToBeRemoved, this, &SyncController::onTorrentAboutToBeRemoved);
++        connect(btSession, &BitTorrent::Session::torrentCategoryChanged, this, &SyncController::onTorrentCategoryChanged);
++        connect(btSession, &BitTorrent::Session::torrentMetadataReceived, this, &SyncController::onTorrentMetadataReceived);
++        connect(btSession, &BitTorrent::Session::torrentPaused, this, &SyncController::onTorrentPaused);
++        connect(btSession, &BitTorrent::Session::torrentResumed, this, &SyncController::onTorrentResumed);
++        connect(btSession, &BitTorrent::Session::torrentSavePathChanged, this, &SyncController::onTorrentSavePathChanged);
++        connect(btSession, &BitTorrent::Session::torrentSavingModeChanged, this, &SyncController::onTorrentSavingModeChanged);
++        connect(btSession, &BitTorrent::Session::torrentTagAdded, this, &SyncController::onTorrentTagAdded);
++        connect(btSession, &BitTorrent::Session::torrentTagRemoved, this, &SyncController::onTorrentTagRemoved);
++        connect(btSession, &BitTorrent::Session::torrentsUpdated, this, &SyncController::onTorrentsUpdated);
++        connect(btSession, &BitTorrent::Session::trackersChanged, this, &SyncController::onTorrentTrackersChanged);
++    }
+ 
+-    QVariantHash torrents;
+-    QHash<QString, QStringList> trackers;
+-    for (const BitTorrent::Torrent *torrent : asConst(session->torrents()))
++    const int acceptedID = params()[u"rid"_qs].toInt();
++    bool fullUpdate = true;
++    if ((acceptedID > 0) && (m_maindataLastSentID > 0))
+     {
+-        const BitTorrent::TorrentID torrentID = torrent->id();
+-
+-        QVariantMap map = serialize(*torrent);
+-        map.remove(KEY_TORRENT_ID);
++        if (m_maindataLastSentID == acceptedID)
++        {
++            m_maindataAcceptedID = acceptedID;
++            m_maindataSyncBuf = {};
++        }
+ 
+-        // Calculated last activity time can differ from actual value by up to 10 seconds (this is a libtorrent issue).
+-        // So we don't need unnecessary updates of last activity time in response.
+-        const auto iterTorrents = m_lastMaindataResponse.find(u"torrents"_qs);
+-        if (iterTorrents != m_lastMaindataResponse.end())
++        if (m_maindataAcceptedID == acceptedID)
+         {
+-            const QVariantHash lastResponseTorrents = iterTorrents->toHash();
+-            const auto iterID = lastResponseTorrents.find(torrentID.toString());
++            // We are still able to send changes for the current state of the data having by client.
++            fullUpdate = false;
++        }
++    }
+ 
+-            if (iterID != lastResponseTorrents.end())
+-            {
+-                const QVariantMap torrentData = iterID->toMap();
+-                const auto iterLastActivity = torrentData.find(KEY_TORRENT_LAST_ACTIVITY_TIME);
++    const int id = (m_maindataLastSentID % 1000000) + 1;  // cycle between 1 and 1000000
++    setResult(generateMaindataSyncData(id, fullUpdate));
++    m_maindataLastSentID = id;
++}
+ 
+-                if (iterLastActivity != torrentData.end())
+-                {
+-                    const int lastValue = iterLastActivity->toInt();
+-                    if (qAbs(lastValue - map[KEY_TORRENT_LAST_ACTIVITY_TIME].toInt()) < 15)
+-                        map[KEY_TORRENT_LAST_ACTIVITY_TIME] = lastValue;
+-                }
+-            }
+-        }
++void SyncController::makeMaindataSnapshot()
++{
++    m_knownTrackers.clear();
++    m_maindataAcceptedID = 0;
++    m_maindataSnapshot = {};
++
++    const auto *session = BitTorrent::Session::instance();
++
++    for (const BitTorrent::Torrent *torrent : asConst(session->torrents()))
++    {
++        const BitTorrent::TorrentID torrentID = torrent->id();
++
++        QVariantMap serializedTorrent = serialize(*torrent);
++        serializedTorrent.remove(KEY_TORRENT_ID);
+ 
+         for (const BitTorrent::TrackerEntry &tracker : asConst(torrent->trackers()))
+-            trackers[tracker.url] << torrentID.toString();
++            m_knownTrackers[tracker.url].insert(torrentID);
+ 
+-        torrents[torrentID.toString()] = map;
++        m_maindataSnapshot.torrents[torrentID.toString()] = serializedTorrent;
+     }
+-    data[u"torrents"_qs] = torrents;
+ 
+-    QVariantHash categories;
+     const QStringList categoriesList = session->categories();
+     for (const auto &categoryName : categoriesList)
+     {
+@@ -492,31 +529,184 @@
+         // adjust it to be compatible with existing WebAPI
+         category[u"savePath"_qs] = category.take(u"save_path"_qs);
+         category.insert(u"name"_qs, categoryName);
+-        categories[categoryName] = category.toVariantMap();
++        m_maindataSnapshot.categories[categoryName] = category.toVariantMap();
+     }
+-    data[u"categories"_qs] = categories;
+ 
+-    QVariantList tags;
+     for (const QString &tag : asConst(session->tags()))
+-        tags << tag;
+-    data[u"tags"_qs] = tags;
++        m_maindataSnapshot.tags.append(tag);
++
++    for (auto trackersIter = m_knownTrackers.cbegin(); trackersIter != m_knownTrackers.cend(); ++trackersIter)
++    {
++        QStringList torrentIDs;
++        for (const BitTorrent::TorrentID &torrentID : asConst(trackersIter.value()))
++            torrentIDs.append(torrentID.toString());
++
++        m_maindataSnapshot.trackers[trackersIter.key()] = torrentIDs;
++    }
++
++    m_maindataSnapshot.serverState = getTransferInfo();
++    m_maindataSnapshot.serverState[KEY_TRANSFER_FREESPACEONDISK] = getFreeDiskSpace();
++    m_maindataSnapshot.serverState[KEY_SYNC_MAINDATA_QUEUEING] = session->isQueueingSystemEnabled();
++    m_maindataSnapshot.serverState[KEY_SYNC_MAINDATA_USE_ALT_SPEED_LIMITS] = session->isAltGlobalSpeedLimitEnabled();
++    m_maindataSnapshot.serverState[KEY_SYNC_MAINDATA_REFRESH_INTERVAL] = session->refreshInterval();
++}
++
++QJsonObject SyncController::generateMaindataSyncData(const int id, const bool fullUpdate)
++{
++    // if need to update existing sync data
++    for (const QString &category : asConst(m_updatedCategories))
++        m_maindataSyncBuf.removedCategories.removeOne(category);
++    for (const QString &category : asConst(m_removedCategories))
++        m_maindataSyncBuf.categories.remove(category);
++
++    for (const QString &tag : asConst(m_addedTags))
++        m_maindataSyncBuf.removedTags.removeOne(tag);
++    for (const QString &tag : asConst(m_removedTags))
++        m_maindataSyncBuf.tags.removeOne(tag);
++
++    for (const BitTorrent::TorrentID &torrentID : asConst(m_updatedTorrents))
++        m_maindataSyncBuf.removedTorrents.removeOne(torrentID.toString());
++    for (const BitTorrent::TorrentID &torrentID : asConst(m_removedTorrents))
++        m_maindataSyncBuf.torrents.remove(torrentID.toString());
++
++    for (const QString &tracker : asConst(m_updatedTrackers))
++        m_maindataSyncBuf.removedTrackers.removeOne(tracker);
++    for (const QString &tracker : asConst(m_removedTrackers))
++        m_maindataSyncBuf.trackers.remove(tracker);
++
++    const auto *session = BitTorrent::Session::instance();
++
++    for (const QString &categoryName : asConst(m_updatedCategories))
++    {
++        const BitTorrent::CategoryOptions categoryOptions = session->categoryOptions(categoryName);
++        auto category = categoryOptions.toJSON().toVariantMap();
++        // adjust it to be compatible with existing WebAPI
++        category[u"savePath"_qs] = category.take(u"save_path"_qs);
++        category.insert(u"name"_qs, categoryName);
++
++        auto &categorySnapshot = m_maindataSnapshot.categories[categoryName];
++        processMap(categorySnapshot, category, m_maindataSyncBuf.categories[categoryName]);
++        categorySnapshot = category;
++    }
++    m_updatedCategories.clear();
++
++    for (const QString &category : asConst(m_removedCategories))
++    {
++        m_maindataSyncBuf.removedCategories.append(category);
++        m_maindataSnapshot.categories.remove(category);
++    }
++    m_removedCategories.clear();
++
++    for (const QString &tag : asConst(m_addedTags))
++    {
++        m_maindataSyncBuf.tags.append(tag);
++        m_maindataSnapshot.tags.append(tag);
++    }
++    m_addedTags.clear();
++
++    for (const QString &tag : asConst(m_removedTags))
++    {
++        m_maindataSyncBuf.removedTags.append(tag);
++        m_maindataSnapshot.tags.removeOne(tag);
++    }
++    m_removedTags.clear();
++
++    for (const BitTorrent::TorrentID &torrentID : asConst(m_updatedTorrents))
++    {
++        const BitTorrent::Torrent *torrent = session->getTorrent(torrentID);
++        Q_ASSERT(torrent);
++
++        QVariantMap serializedTorrent = serialize(*torrent);
++        serializedTorrent.remove(KEY_TORRENT_ID);
++
++        auto &torrentSnapshot = m_maindataSnapshot.torrents[torrentID.toString()];
++        processMap(torrentSnapshot, serializedTorrent, m_maindataSyncBuf.torrents[torrentID.toString()]);
++        torrentSnapshot = serializedTorrent;
++    }
++    m_updatedTorrents.clear();
++
++    for (const BitTorrent::TorrentID &torrentID : asConst(m_removedTorrents))
++    {
++        m_maindataSyncBuf.removedTorrents.append(torrentID.toString());
++        m_maindataSnapshot.torrents.remove(torrentID.toString());
++    }
++    m_removedTorrents.clear();
++
++    for (const QString &tracker : asConst(m_updatedTrackers))
++    {
++        const QSet<BitTorrent::TorrentID> torrentIDs = m_knownTrackers[tracker];
++        QStringList serializedTorrentIDs;
++        serializedTorrentIDs.reserve(torrentIDs.size());
++        for (const BitTorrent::TorrentID &torrentID : torrentIDs)
++            serializedTorrentIDs.append(torrentID.toString());
++
++        m_maindataSyncBuf.trackers[tracker] = serializedTorrentIDs;
++        m_maindataSnapshot.trackers[tracker] = serializedTorrentIDs;
++    }
++    m_updatedTrackers.clear();
+ 
+-    QVariantHash trackersHash;
+-    for (auto i = trackers.constBegin(); i != trackers.constEnd(); ++i)
++    for (const QString &tracker : asConst(m_removedTrackers))
+     {
+-        trackersHash[i.key()] = i.value();
++        m_maindataSyncBuf.removedTrackers.append(tracker);
++        m_maindataSnapshot.trackers.remove(tracker);
+     }
+-    data[u"trackers"_qs] = trackersHash;
++    m_removedTrackers.clear();
+ 
+     QVariantMap serverState = getTransferInfo();
+     serverState[KEY_TRANSFER_FREESPACEONDISK] = getFreeDiskSpace();
+     serverState[KEY_SYNC_MAINDATA_QUEUEING] = session->isQueueingSystemEnabled();
+     serverState[KEY_SYNC_MAINDATA_USE_ALT_SPEED_LIMITS] = session->isAltGlobalSpeedLimitEnabled();
+     serverState[KEY_SYNC_MAINDATA_REFRESH_INTERVAL] = session->refreshInterval();
+-    data[u"server_state"_qs] = serverState;
++    processMap(m_maindataSnapshot.serverState, serverState, m_maindataSyncBuf.serverState);
++    m_maindataSnapshot.serverState = serverState;
+ 
+-    const int acceptedResponseId = params()[u"rid"_qs].toInt();
+-    setResult(QJsonObject::fromVariantMap(generateSyncData(acceptedResponseId, data, m_lastAcceptedMaindataResponse, m_lastMaindataResponse)));
++    QJsonObject syncData;
++    syncData[KEY_RESPONSE_ID] = id;
++    if (fullUpdate)
++    {
++        m_maindataSyncBuf = m_maindataSnapshot;
++        syncData[KEY_FULL_UPDATE] = true;
++    }
++
++    if (!m_maindataSyncBuf.categories.isEmpty())
++    {
++        QJsonObject categories;
++        for (auto it = m_maindataSyncBuf.categories.cbegin(); it != m_maindataSyncBuf.categories.cend(); ++it)
++            categories[it.key()] = QJsonObject::fromVariantMap(it.value());
++        syncData[KEY_CATEGORIES] = categories;
++    }
++    if (!m_maindataSyncBuf.removedCategories.isEmpty())
++        syncData[KEY_CATEGORIES_REMOVED] = QJsonArray::fromStringList(m_maindataSyncBuf.removedCategories);
++
++    if (!m_maindataSyncBuf.tags.isEmpty())
++        syncData[KEY_TAGS] = QJsonArray::fromVariantList(m_maindataSyncBuf.tags);
++    if (!m_maindataSyncBuf.removedTags.isEmpty())
++        syncData[KEY_TAGS_REMOVED] = QJsonArray::fromStringList(m_maindataSyncBuf.removedTags);
++
++    if (!m_maindataSyncBuf.torrents.isEmpty())
++    {
++        QJsonObject torrents;
++        for (auto it = m_maindataSyncBuf.torrents.cbegin(); it != m_maindataSyncBuf.torrents.cend(); ++it)
++            torrents[it.key()] = QJsonObject::fromVariantMap(it.value());
++        syncData[KEY_TORRENTS] = torrents;
++    }
++    if (!m_maindataSyncBuf.removedTorrents.isEmpty())
++        syncData[KEY_TORRENTS_REMOVED] = QJsonArray::fromStringList(m_maindataSyncBuf.removedTorrents);
++
++    if (!m_maindataSyncBuf.trackers.isEmpty())
++    {
++        QJsonObject trackers;
++        for (auto it = m_maindataSyncBuf.trackers.cbegin(); it != m_maindataSyncBuf.trackers.cend(); ++it)
++            trackers[it.key()] = QJsonArray::fromStringList(it.value());
++        syncData[KEY_TRACKERS] = trackers;
++    }
++    if (!m_maindataSyncBuf.removedTrackers.isEmpty())
++        syncData[KEY_TRACKERS_REMOVED] = QJsonArray::fromStringList(m_maindataSyncBuf.removedTrackers);
++
++    if (!m_maindataSyncBuf.serverState.isEmpty())
++        syncData[KEY_SERVER_STATE] = QJsonObject::fromVariantMap(m_maindataSyncBuf.serverState);
++
++    return syncData;
+ }
+ 
+ // GET param:
+@@ -580,7 +770,7 @@
+     data[u"peers"_qs] = peers;
+ 
+     const int acceptedResponseId = params()[u"rid"_qs].toInt();
+-    setResult(QJsonObject::fromVariantMap(generateSyncData(acceptedResponseId, data, m_lastAcceptedPeersResponse, m_lastPeersResponse)));
++    setResult(generateSyncData(acceptedResponseId, data, m_lastAcceptedPeersResponse, m_lastPeersResponse));
+ }
+ 
+ qint64 SyncController::getFreeDiskSpace()
+@@ -610,3 +800,189 @@
+         freeDiskSpaceChecker->check();
+     });
+ }
++
++void SyncController::onCategoryAdded(const QString &categoryName)
++{
++    m_removedCategories.remove(categoryName);
++    m_updatedCategories.insert(categoryName);
++}
++
++void SyncController::onCategoryRemoved(const QString &categoryName)
++{
++    m_updatedCategories.remove(categoryName);
++    m_removedCategories.insert(categoryName);
++}
++
++void SyncController::onCategoryOptionsChanged(const QString &categoryName)
++{
++    Q_ASSERT(!m_removedCategories.contains(categoryName));
++
++    m_updatedCategories.insert(categoryName);
++}
++
++void SyncController::onSubcategoriesSupportChanged()
++{
++    const QStringList categoriesList = BitTorrent::Session::instance()->categories();
++    for (const auto &categoryName : categoriesList)
++    {
++        if (!m_maindataSnapshot.categories.contains(categoryName))
++        {
++            m_removedCategories.remove(categoryName);
++            m_updatedCategories.insert(categoryName);
++        }
++    }
++}
++
++void SyncController::onTagAdded(const QString &tag)
++{
++    m_removedTags.remove(tag);
++    m_addedTags.insert(tag);
++}
++
++void SyncController::onTagRemoved(const QString &tag)
++{
++    m_addedTags.remove(tag);
++    m_removedTags.insert(tag);
++}
++
++void SyncController::onTorrentAdded(BitTorrent::Torrent *torrent)
++{
++    const BitTorrent::TorrentID torrentID = torrent->id();
++
++    m_removedTorrents.remove(torrentID);
++    m_updatedTorrents.insert(torrentID);
++
++    for (const BitTorrent::TrackerEntry &trackerEntry : asConst(torrent->trackers()))
++    {
++        m_knownTrackers[trackerEntry.url].insert(torrentID);
++        m_updatedTrackers.insert(trackerEntry.url);
++        m_removedTrackers.remove(trackerEntry.url);
++    }
++}
++
++void SyncController::onTorrentAboutToBeRemoved(BitTorrent::Torrent *torrent)
++{
++    const BitTorrent::TorrentID torrentID = torrent->id();
++
++    m_updatedTorrents.remove(torrentID);
++    m_removedTorrents.insert(torrentID);
++
++    for (const BitTorrent::TrackerEntry &trackerEntry : asConst(torrent->trackers()))
++    {
++        auto iter = m_knownTrackers.find(trackerEntry.url);
++        Q_ASSERT(iter != m_knownTrackers.end());
++        if (Q_UNLIKELY(iter == m_knownTrackers.end()))
++            continue;
++
++        QSet<BitTorrent::TorrentID> &torrentIDs = iter.value();
++        torrentIDs.remove(torrentID);
++        if (torrentIDs.isEmpty())
++        {
++            m_knownTrackers.erase(iter);
++            m_updatedTrackers.remove(trackerEntry.url);
++            m_removedTrackers.insert(trackerEntry.url);
++        }
++        else
++        {
++            m_updatedTrackers.insert(trackerEntry.url);
++        }
++    }
++}
++
++void SyncController::onTorrentCategoryChanged(BitTorrent::Torrent *torrent
++        , [[maybe_unused]] const QString &oldCategory)
++{
++    m_updatedTorrents.insert(torrent->id());
++}
++
++void SyncController::onTorrentMetadataReceived(BitTorrent::Torrent *torrent)
++{
++    m_updatedTorrents.insert(torrent->id());
++}
++
++void SyncController::onTorrentPaused(BitTorrent::Torrent *torrent)
++{
++    m_updatedTorrents.insert(torrent->id());
++}
++
++void SyncController::onTorrentResumed(BitTorrent::Torrent *torrent)
++{
++    m_updatedTorrents.insert(torrent->id());
++}
++
++void SyncController::onTorrentSavePathChanged(BitTorrent::Torrent *torrent)
++{
++    m_updatedTorrents.insert(torrent->id());
++}
++
++void SyncController::onTorrentSavingModeChanged(BitTorrent::Torrent *torrent)
++{
++    m_updatedTorrents.insert(torrent->id());
++}
++
++void SyncController::onTorrentTagAdded(BitTorrent::Torrent *torrent, [[maybe_unused]] const QString &tag)
++{
++    m_updatedTorrents.insert(torrent->id());
++}
++
++void SyncController::onTorrentTagRemoved(BitTorrent::Torrent *torrent, [[maybe_unused]] const QString &tag)
++{
++    m_updatedTorrents.insert(torrent->id());
++}
++
++void SyncController::onTorrentsUpdated(const QVector<BitTorrent::Torrent *> &torrents)
++{
++    for (const BitTorrent::Torrent *torrent : torrents)
++        m_updatedTorrents.insert(torrent->id());
++}
++
++void SyncController::onTorrentTrackersChanged(BitTorrent::Torrent *torrent)
++{
++    using namespace BitTorrent;
++
++    const QVector<TrackerEntry> currentTrackerEntries = torrent->trackers();
++    QSet<QString> currentTrackers;
++    currentTrackers.reserve(currentTrackerEntries.size());
++    for (const TrackerEntry &currentTrackerEntry : currentTrackerEntries)
++        currentTrackers.insert(currentTrackerEntry.url);
++
++    const TorrentID torrentID = torrent->id();
++    Algorithm::removeIf(m_knownTrackers
++            , [this, torrentID, currentTrackers]
++                    (const QString &knownTracker, QSet<TorrentID> &torrentIDs)
++    {
++        if (auto idIter = torrentIDs.find(torrentID)
++                ; (idIter != torrentIDs.end()) && !currentTrackers.contains(knownTracker))
++        {
++            torrentIDs.erase(idIter);
++            if (torrentIDs.isEmpty())
++            {
++                m_updatedTrackers.remove(knownTracker);
++                m_removedTrackers.insert(knownTracker);
++                return true;
++            }
++
++            m_updatedTrackers.insert(knownTracker);
++            return false;
++        }
++
++        if (currentTrackers.contains(knownTracker) && !torrentIDs.contains(torrentID))
++        {
++            torrentIDs.insert(torrentID);
++            m_updatedTrackers.insert(knownTracker);
++            return false;
++        }
++
++        return false;
++    });
++
++    for (const QString &currentTracker : asConst(currentTrackers))
++    {
++        if (!m_knownTrackers.contains(currentTracker))
++        {
++            m_knownTrackers.insert(currentTracker, {torrentID});
++            m_updatedTrackers.insert(currentTracker);
++            m_removedTrackers.remove(currentTracker);
++        }
++    }
++}
+diff -ruN a/src/webui/api/synccontroller.h b/src/webui/api/synccontroller.h
+--- a/src/webui/api/synccontroller.h	2023-05-28 07:01:39.000000000 +0800
++++ b/src/webui/api/synccontroller.h	2023-05-30 00:23:36.000000000 +0800
+@@ -1,6 +1,6 @@
+ /*
+  * Bittorrent Client using Qt and libtorrent.
+- * Copyright (C) 2018  Vladimir Golovnev <glassez@yandex.ru>
++ * Copyright (C) 2018-2023  Vladimir Golovnev <glassez@yandex.ru>
+  *
+  * This program is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU General Public License
+@@ -30,11 +30,18 @@
+ 
+ #include <QElapsedTimer>
+ #include <QVariantMap>
++#include <QSet>
+ 
++#include "base/bittorrent/infohash.h"
+ #include "apicontroller.h"
+ 
+ class QThread;
+ 
++namespace BitTorrent
++{
++    class Torrent;
++}
++
+ class FreeDiskSpaceChecker;
+ 
+ class SyncController : public APIController
+@@ -55,12 +62,62 @@
+     qint64 getFreeDiskSpace();
+     void invokeChecker();
+ 
++    void makeMaindataSnapshot();
++    QJsonObject generateMaindataSyncData(int id, bool fullUpdate);
++
++    void onCategoryAdded(const QString &categoryName);
++    void onCategoryRemoved(const QString &categoryName);
++    void onCategoryOptionsChanged(const QString &categoryName);
++    void onSubcategoriesSupportChanged();
++    void onTagAdded(const QString &tag);
++    void onTagRemoved(const QString &tag);
++    void onTorrentAdded(BitTorrent::Torrent *torrent);
++    void onTorrentAboutToBeRemoved(BitTorrent::Torrent *torrent);
++    void onTorrentCategoryChanged(BitTorrent::Torrent *torrent, const QString &oldCategory);
++    void onTorrentMetadataReceived(BitTorrent::Torrent *torrent);
++    void onTorrentPaused(BitTorrent::Torrent *torrent);
++    void onTorrentResumed(BitTorrent::Torrent *torrent);
++    void onTorrentSavePathChanged(BitTorrent::Torrent *torrent);
++    void onTorrentSavingModeChanged(BitTorrent::Torrent *torrent);
++    void onTorrentTagAdded(BitTorrent::Torrent *torrent, const QString &tag);
++    void onTorrentTagRemoved(BitTorrent::Torrent *torrent, const QString &tag);
++    void onTorrentsUpdated(const QVector<BitTorrent::Torrent *> &torrents);
++    void onTorrentTrackersChanged(BitTorrent::Torrent *torrent);
++
+     qint64 m_freeDiskSpace = 0;
+     QElapsedTimer m_freeDiskSpaceElapsedTimer;
+     bool m_isFreeDiskSpaceCheckerRunning = false;
+ 
+-    QVariantMap m_lastMaindataResponse;
+-    QVariantMap m_lastAcceptedMaindataResponse;
+     QVariantMap m_lastPeersResponse;
+     QVariantMap m_lastAcceptedPeersResponse;
++
++    QHash<QString, QSet<BitTorrent::TorrentID>> m_knownTrackers;
++
++    QSet<QString> m_updatedCategories;
++    QSet<QString> m_removedCategories;
++    QSet<QString> m_addedTags;
++    QSet<QString> m_removedTags;
++    QSet<QString> m_updatedTrackers;
++    QSet<QString> m_removedTrackers;
++    QSet<BitTorrent::TorrentID> m_updatedTorrents;
++    QSet<BitTorrent::TorrentID> m_removedTorrents;
++
++    struct MaindataSyncBuf
++    {
++        QHash<QString, QVariantMap> categories;
++        QVariantList tags;
++        QHash<QString, QVariantMap> torrents;
++        QHash<QString, QStringList> trackers;
++        QVariantMap serverState;
++
++        QStringList removedCategories;
++        QStringList removedTags;
++        QStringList removedTorrents;
++        QStringList removedTrackers;
++    };
++
++    MaindataSyncBuf m_maindataSnapshot;
++    MaindataSyncBuf m_maindataSyncBuf;
++    int m_maindataLastSentID = 0;
++    int m_maindataAcceptedID = -1;
+ };
+diff -ruN a/src/webui/webapplication.h b/src/webui/webapplication.h
+--- a/src/webui/webapplication.h	2023-05-28 07:01:39.000000000 +0800
++++ b/src/webui/webapplication.h	2023-05-30 00:23:36.000000000 +0800
+@@ -52,7 +52,7 @@
+ #include "base/utils/version.h"
+ #include "api/isessionmanager.h"
+ 
+-inline const Utils::Version<3, 2> API_VERSION {2, 8, 19};
++inline const Utils::Version<3, 2> API_VERSION {2, 8, 20};
+ 
+ class APIController;
+ class AuthController;
+diff -ruN a/src/webui/www/private/index.html b/src/webui/www/private/index.html
+--- a/src/webui/www/private/index.html	2023-05-28 07:01:39.000000000 +0800
++++ b/src/webui/www/private/index.html	2023-05-30 00:23:36.000000000 +0800
+@@ -5,7 +5,7 @@
+     <meta charset="UTF-8" />
+     <meta http-equiv="X-UA-Compatible" content="IE=10" />
+     <meta name="application-name" content="qBittorrent" />
+-    <title>qBittorrent Web UI</title>
++    <title>qBittorrent Enhanced Edition Web UI</title>
+     <link rel="icon" type="image/png" href="images/qbittorrent32.png" sizes="32x32" />
+     <link rel="icon" type="image/svg+xml" href="images/qbittorrent-tray.svg" sizes="any" />
+     <link rel="stylesheet" type="text/css" href="css/dynamicTable.css?v=${CACHEID}" />
+diff -ruN a/src/webui/www/private/scripts/client.js b/src/webui/www/private/scripts/client.js
+--- a/src/webui/www/private/scripts/client.js	2023-05-28 07:01:39.000000000 +0800
++++ b/src/webui/www/private/scripts/client.js	2023-05-30 00:23:36.000000000 +0800
+@@ -741,11 +741,11 @@
+         transfer_info += " (" + window.qBittorrent.Misc.friendlyUnit(serverState.up_info_data, false) + ")";
+         $("UpInfos").set('html', transfer_info);
+         if (speedInTitle) {
+-            document.title = "QBT_TR([D: %1, U: %2] qBittorrent %3)QBT_TR[CONTEXT=MainWindow]".replace("%1", window.qBittorrent.Misc.friendlyUnit(serverState.dl_info_speed, true)).replace("%2", window.qBittorrent.Misc.friendlyUnit(serverState.up_info_speed, true)).replace("%3", qbtVersion());
++            document.title = "QBT_TR([D: %1, U: %2] qBittorrent Enhanced Edition %3)QBT_TR[CONTEXT=MainWindow]".replace("%1", window.qBittorrent.Misc.friendlyUnit(serverState.dl_info_speed, true)).replace("%2", window.qBittorrent.Misc.friendlyUnit(serverState.up_info_speed, true)).replace("%3", qbtVersion());
+             document.title += " QBT_TR(Web UI)QBT_TR[CONTEXT=OptionsDialog]";
+         }
+         else
+-            document.title = ("qBittorrent " + qbtVersion() + " QBT_TR(Web UI)QBT_TR[CONTEXT=OptionsDialog]");
++            document.title = ("qBittorrent Enhanced Edition " + qbtVersion() + " QBT_TR(Web UI)QBT_TR[CONTEXT=OptionsDialog]");
+         $('freeSpaceOnDisk').set('html', 'QBT_TR(Free space: %1)QBT_TR[CONTEXT=HttpServer]'.replace("%1", window.qBittorrent.Misc.friendlyUnit(serverState.free_space_on_disk)));
+         $('DHTNodes').set('html', 'QBT_TR(DHT: %1 nodes)QBT_TR[CONTEXT=StatusBar]'.replace("%1", serverState.dht_nodes));
+ 
+diff -ruN a/src/webui/www/private/views/about.html b/src/webui/www/private/views/about.html
+--- a/src/webui/www/private/views/about.html	2023-05-28 07:01:39.000000000 +0800
++++ b/src/webui/www/private/views/about.html	2023-05-30 00:23:36.000000000 +0800
+@@ -19,6 +19,14 @@
+             <td>QBT_TR(Forum:)QBT_TR[CONTEXT=AboutDialog]</td>
+             <td><a href="http://forum.qbittorrent.org" target="_blank">http://forum.qbittorrent.org</a></td>
+         </tr>
++        <tr>
++            <td>QBT_TR(Enhanced Edition:)QBT_TR[CONTEXT=AboutDialog]</td>
++            <td><a href="https://github.com/c0re100/qBittorrent-Enhanced-Edition" target="_blank">GitHub Repository</a></td>
++        </tr>
++        <tr>
++            <td>QBT_TR(Maintainer:)QBT_TR[CONTEXT=AboutDialog]</td>
++            <td><a href="https://t.me/loli_make_the_world_great_again" target="_blank">Husky</a></td>
++        </tr>
+     </table>
+ </div>
+ 
+@@ -844,7 +852,7 @@
+     'use strict';
+ 
+     (function() {
+-        $('qbittorrentVersion').innerText = ("qBittorrent " + qbtVersion()
++        $('qbittorrentVersion').innerText = ("qBittorrent Enhanced Edition " + qbtVersion()
+             + " QBT_TR(Web UI)QBT_TR[CONTEXT=OptionsDialog]");
+ 
+         new Request.JSON({
+diff -ruN a/src/webui/www/private/views/preferences.html b/src/webui/www/private/views/preferences.html
+--- a/src/webui/www/private/views/preferences.html	2023-05-28 07:01:39.000000000 +0800
++++ b/src/webui/www/private/views/preferences.html	2023-05-30 00:23:36.000000000 +0800
+@@ -1,4 +1,49 @@
+-<div id="DownloadsTab" class="PrefTab">
++<div id="BehaviorTab" class="PrefTab">
++    <fieldset class="settings">
++        <legend>QBT_TR(Language)QBT_TR[CONTEXT=OptionsDialog]</legend>
++        <label for="locale_select">QBT_TR(User Interface Language:)QBT_TR[CONTEXT=OptionsDialog]</label>
++        <select id="locale_select">
++            ${LANGUAGE_OPTIONS}
++        </select>
++    </fieldset>
++
++    <fieldset class="settings">
++        <legend>
++            <input type="checkbox" id="filelog_checkbox" onclick="qBittorrent.Preferences.updateFileLogEnabled();" />
++            <label for="filelog_checkbox">QBT_TR(Log file)QBT_TR[CONTEXT=OptionsDialog]</label>
++        </legend>
++        <div class="formRow">
++            <label for="filelog_save_path_input">QBT_TR(Save path:)QBT_TR[CONTEXT=OptionsDialog]</label>
++            <input type="text" id="filelog_save_path_input" />
++        </div>
++        <table>
++            <tr>
++                <td><input type="checkbox" id="filelog_backup_checkbox" onclick="qBittorrent.Preferences.updateFileLogBackupEnabled();" /></td>
++                <td><label for="filelog_backup_checkbox">QBT_TR(Backup the log file after:)QBT_TR[CONTEXT=OptionsDialog]</label></td>
++                <td><input id="filelog_max_size_input" type=number min="1" max="1024000" value="65" onchange="qBittorrent.Preferences.numberInputLimiter(this);" />QBT_TR(KiB)QBT_TR[CONTEXT=OptionsDialog]</td>
++            </tr>
++            <tr>
++                <td><input type="checkbox" id="filelog_delete_old_checkbox" onclick="qBittorrent.Preferences.updateFileLogDeleteEnabled();" /></td>
++                <td><label for="filelog_delete_old_checkbox">QBT_TR(Delete backup logs older than:)QBT_TR[CONTEXT=OptionsDialog]</label></td>
++                <td>
++                    <input type=number min="1" max="365" value="6" id="filelog_age_input" onchange="qBittorrent.Preferences.numberInputLimiter(this);" />
++                    <select id="filelog_age_type_select">
++                        <option value="0">QBT_TR(days)QBT_TR[CONTEXT=OptionsDialog]</option>
++                        <option value="1" selected>QBT_TR(months)QBT_TR[CONTEXT=OptionsDialog]</option>
++                        <option value="2">QBT_TR(years)QBT_TR[CONTEXT=OptionsDialog]</option>
++                    </select>
++                </td>
++            </tr>
++        </table>
++    </fieldset>
++
++    <div class="formRow">
++        <input type="checkbox" id="performanceWarning" />
++        <label for="performanceWarning">QBT_TR(Log performance warnings)QBT_TR[CONTEXT=OptionsDialog]</label>
++    </div>
++</div>
++
++<div id="DownloadsTab" class="PrefTab invisible">
+     <fieldset class="settings">
+         <legend>QBT_TR(When adding a torrent)QBT_TR[CONTEXT=OptionsDialog]</legend>
+         <div class="formRow">
+@@ -611,6 +656,25 @@
+         </legend>
+         <textarea id="add_trackers_textarea" rows="5" cols="70"></textarea>
+     </fieldset>
++
++    <fieldset class="settings">
++        <legend><input type="checkbox" id="auto_update_trackers_checkbox" />
++            <label for="auto_update_trackers_checkbox">QBT_TR(Automatically update public trackers list:)QBT_TR[CONTEXT=OptionsDialog]</label>
++        </legend>
++        <table>
++            <tr>
++                <td>
++                    Customize Trackers List Url:
++                    <input type="text" id="customize_trackers_list_url" style="width: 40em;" />
++                </td>
++            </tr>
++            <tr>
++                <td>
++                    <textarea id="public_trackers_textarea" rows="5" cols="70" readonly></textarea>
++                </td>
++            </tr>
++        </table>
++    </fieldset>
+ </div>
+ 
+ <div id="RSSTab" class="PrefTab invisible">
+@@ -663,19 +727,6 @@
+ 
+ <div id="WebUITab" class="PrefTab invisible">
+     <fieldset class="settings">
+-        <legend>QBT_TR(Language)QBT_TR[CONTEXT=OptionsDialog]</legend>
+-        <label for="locale_select">QBT_TR(User Interface Language:)QBT_TR[CONTEXT=OptionsDialog]</label>
+-        <select id="locale_select">
+-            ${LANGUAGE_OPTIONS}
+-        </select>
+-    </fieldset>
+-
+-    <div class="formRow">
+-        <input type="checkbox" id="performanceWarning" />
+-        <label for="performanceWarning">QBT_TR(Log performance warnings)QBT_TR[CONTEXT=OptionsDialog]</label>
+-    </div>
+-
+-    <fieldset class="settings">
+         <legend>QBT_TR(Web User Interface (Remote control))QBT_TR[CONTEXT=OptionsDialog]</legend>
+         <table>
+             <tr>
+@@ -980,6 +1031,22 @@
+                     <input type="checkbox" id="embeddedTrackerPortForwarding" />
+                 </td>
+             </tr>
++            <tr>
++                <td>
++                    <label for="autoBanUnknownPeer">QBT_TR(Auto Ban Unknown Client From China:)QBT_TR[CONTEXT=OptionsDialog]</label>
++                </td>
++                <td>
++                    <input type="checkbox" id="autoBanUnknownPeer">
++                </td>
++            </tr>
++            <tr>
++                <td>
++                    <label for="autoBanBittorrentPlayer">QBT_TR(Auto Ban Bittorrent Media Player:)QBT_TR[CONTEXT=OptionsDialog]</label>
++                </td>
++                <td>
++                    <input type="checkbox" id="autoBanBittorrentPlayer">
++                </td>
++            </tr>
+         </table>
+     </fieldset>
+     <fieldset class="settings">
+@@ -1334,6 +1401,10 @@
+     window.qBittorrent.Preferences = (function() {
+         const exports = function() {
+             return {
++                numberInputLimiter: numberInputLimiter,
++                updateFileLogEnabled: updateFileLogEnabled,
++                updateFileLogBackupEnabled: updateFileLogBackupEnabled,
++                updateFileLogDeleteEnabled: updateFileLogDeleteEnabled,
+                 updateTempDirEnabled: updateTempDirEnabled,
+                 updateExportDirEnabled: updateExportDirEnabled,
+                 updateExportDirFinEnabled: updateExportDirFinEnabled,
+@@ -1370,6 +1441,39 @@
+             };
+         };
+ 
++        // Behavior tab
++        const numberInputLimiter = (input) => {
++            const min = input.getAttribute("min");
++            const max = input.getAttribute("max");
++
++            if (min && input.value.toInt() < min.toInt())
++                input.value = min;
++
++            if (max && input.value.toInt() > max.toInt())
++                input.value = max;
++        };
++
++        const updateFileLogEnabled = function() {
++            const isFileLogEnabled = $('filelog_checkbox').getProperty('checked');
++            $('filelog_save_path_input').setProperty('disabled', !isFileLogEnabled);
++            $('filelog_backup_checkbox').setProperty('disabled', !isFileLogEnabled);
++            $('filelog_delete_old_checkbox').setProperty('disabled', !isFileLogEnabled);
++
++            updateFileLogBackupEnabled();
++            updateFileLogDeleteEnabled();
++        };
++
++        const updateFileLogBackupEnabled = function() {
++            const pros = $('filelog_backup_checkbox').getProperties('disabled', 'checked');
++            $('filelog_max_size_input').setProperty('disabled', pros.disabled || !pros.checked);
++        };
++
++        const updateFileLogDeleteEnabled = function() {
++            const pros = $('filelog_delete_old_checkbox').getProperties('disabled', 'checked');
++            $('filelog_age_input').setProperty('disabled', pros.disabled || !pros.checked);
++            $('filelog_age_type_select').setProperty('disabled', pros.disabled || !pros.checked);
++        };
++
+         // Downloads tab
+         const watchedFoldersTable = new HtmlTable($("watched_folders_tab"));
+ 
+@@ -1717,6 +1821,16 @@
+                 },
+                 onSuccess: function(pref) {
+                     if (pref) {
++                        // Behavior tab
++                        $('filelog_checkbox').setProperty('checked', pref.file_log_enabled);
++                        $('filelog_save_path_input').setProperty('value', pref.file_log_path);
++                        $('filelog_backup_checkbox').setProperty('checked', pref.file_log_backup_enabled);
++                        $('filelog_max_size_input').setProperty('value', pref.file_log_max_size);
++                        $('filelog_delete_old_checkbox').setProperty('checked', pref.file_log_delete_old);
++                        $('filelog_age_input').setProperty('value', pref.file_log_age);
++                        $('filelog_age_type_select').setProperty('value', pref.file_log_age_type);
++                        updateFileLogEnabled();
++
+                         // Downloads tab
+                         // When adding a torrent
+                         let index = 0;
+@@ -1970,6 +2084,9 @@
+                         // Add trackers
+                         $('add_trackers_checkbox').setProperty('checked', pref.add_trackers_enabled);
+                         $('add_trackers_textarea').setProperty('value', pref.add_trackers);
++                        $('auto_update_trackers_checkbox').setProperty('checked', pref.auto_update_trackers_enabled);
++                        $('public_trackers_textarea').setProperty('value', pref.public_trackers);
++                        $('customize_trackers_list_url').setProperty('value', pref.customize_trackers_list_url);
+                         updateAddTrackersEnabled();
+ 
+                         // RSS Tab
+@@ -2046,6 +2163,8 @@
+                         $('refreshInterval').setProperty('value', pref.refresh_interval);
+                         $('resolvePeerCountries').setProperty('checked', pref.resolve_peer_countries);
+                         $('reannounceWhenAddressChanged').setProperty('checked', pref.reannounce_when_address_changed);
++                        $('autoBanUnknownPeer').setProperty('checked', pref.auto_ban_unknown_peer);
++                        $('autoBanBittorrentPlayer').setProperty('checked', pref.auto_ban_bt_player_peer);
+                         // libtorrent section
+                         $('asyncIOThreads').setProperty('value', pref.async_io_threads);
+                         $('hashingThreads').setProperty('value', pref.hashing_threads);
+@@ -2097,6 +2216,16 @@
+         const applyPreferences = function() {
+             const settings = new Hash();
+             // Validate form data
++
++            // Behavior tab
++            settings.set('file_log_enabled', $('filelog_checkbox').getProperty('checked'));
++            settings.set('file_log_path', $('filelog_save_path_input').getProperty('value'));
++            settings.set('file_log_backup_enabled', $('filelog_backup_checkbox').getProperty('checked'));
++            settings.set('file_log_max_size', $('filelog_max_size_input').getProperty('value'));
++            settings.set('file_log_delete_old', $('filelog_delete_old_checkbox').getProperty('checked'));
++            settings.set('file_log_age', $('filelog_age_input').getProperty('value'));
++            settings.set('file_log_age_type', $('filelog_age_type_select').getProperty('value'));
++
+             // Downloads tab
+             // When adding a torrent
+             settings.set('torrent_content_layout', $('contentlayout_select').getSelected()[0].getProperty('value'));
+@@ -2367,6 +2496,8 @@
+             // Add trackers
+             settings.set('add_trackers_enabled', $('add_trackers_checkbox').getProperty('checked'));
+             settings.set('add_trackers', $('add_trackers_textarea').getProperty('value'));
++            settings.set('auto_update_trackers_enabled', $('auto_update_trackers_checkbox').getProperty('checked'));
++            settings.set('customize_trackers_list_url', $('customize_trackers_list_url').getProperty('value'));
+ 
+             // RSS Tab
+             settings.set('rss_processing_enabled', $('enable_fetching_rss_feeds_checkbox').getProperty('checked'));
+@@ -2474,6 +2605,8 @@
+             settings.set('refresh_interval', $('refreshInterval').getProperty('value'));
+             settings.set('resolve_peer_countries', $('resolvePeerCountries').getProperty('checked'));
+             settings.set('reannounce_when_address_changed', $('reannounceWhenAddressChanged').getProperty('checked'));
++            settings.set('auto_ban_unknown_peer', $('autoBanUnknownPeer').getProperty('checked'));
++            settings.set('auto_ban_bt_player_peer', $('autoBanBittorrentPlayer').getProperty('checked'));
+ 
+             // libtorrent section
+             settings.set('async_io_threads', $('asyncIOThreads').getProperty('value'));
+diff -ruN a/src/webui/www/private/views/preferencesToolbar.html b/src/webui/www/private/views/preferencesToolbar.html
+--- a/src/webui/www/private/views/preferencesToolbar.html	2023-05-28 07:01:39.000000000 +0800
++++ b/src/webui/www/private/views/preferencesToolbar.html	2023-05-30 00:23:36.000000000 +0800
+@@ -1,7 +1,8 @@
+ <!-- preferences -->
+ <div class="toolbarTabs">
+     <ul id="preferencesTabs" class="tab-menu">
+-        <li id="PrefDownloadsLink" class="selected"><a>QBT_TR(Downloads)QBT_TR[CONTEXT=OptionsDialog]</a></li>
++        <li id="PrefBehaviorLink" class="selected"><a>QBT_TR(Behavior)QBT_TR[CONTEXT=OptionsDialog]</a></li>
++        <li id="PrefDownloadsLink"><a>QBT_TR(Downloads)QBT_TR[CONTEXT=OptionsDialog]</a></li>
+         <li id="PrefConnectionLink"><a>QBT_TR(Connection)QBT_TR[CONTEXT=OptionsDialog]</a></li>
+         <li id="PrefSpeedLink"><a>QBT_TR(Speed)QBT_TR[CONTEXT=OptionsDialog]</a></li>
+         <li id="PrefBittorrentLink"><a>QBT_TR(BitTorrent)QBT_TR[CONTEXT=OptionsDialog]</a></li>
+@@ -19,6 +20,10 @@
+         // Tabs
+         MochaUI.initializeTabs('preferencesTabs');
+ 
++        $('PrefBehaviorLink').addEvent('click', function(e) {
++            $$('.PrefTab').addClass('invisible');
++            $('BehaviorTab').removeClass('invisible');
++        });
+         $('PrefDownloadsLink').addEvent('click', function(e) {
+             $$('.PrefTab').addClass('invisible');
+             $('DownloadsTab').removeClass('invisible');
+diff -ruN a/src/webui/www/public/index.html b/src/webui/www/public/index.html
+--- a/src/webui/www/public/index.html	2023-05-28 07:01:39.000000000 +0800
++++ b/src/webui/www/public/index.html	2023-05-30 00:23:36.000000000 +0800
+@@ -3,7 +3,7 @@
+ 
+ <head>
+     <meta charset="UTF-8" />
+-    <title>qBittorrent QBT_TR(Web UI)QBT_TR[CONTEXT=OptionsDialog]</title>
++    <title>qBittorrent Enhanced Edition QBT_TR(Web UI)QBT_TR[CONTEXT=OptionsDialog]</title>
+     <link rel="icon" type="image/png" href="images/qbittorrent32.png" />
+     <link rel="icon" type="image/svg+xml" href="images/qbittorrent-tray.svg" />
+     <link rel="stylesheet" type="text/css" href="css/login.css?v=${CACHEID}" />
+@@ -18,7 +18,7 @@
+         <h1>QBT_TR(JavaScript Required! You must enable JavaScript for the Web UI to work properly)QBT_TR[CONTEXT=HttpServer]</h1>
+     </noscript>
+     <div id="main">
+-        <h1>qBittorrent QBT_TR(Web UI)QBT_TR[CONTEXT=OptionsDialog]</h1>
++        <h1>qBittorrent Enhanced Edition QBT_TR(Web UI)QBT_TR[CONTEXT=OptionsDialog]</h1>
+         <div id="logo" class="col">
+             <img src="images/qbittorrent-tray.svg" alt="qBittorrent logo" />
+         </div>

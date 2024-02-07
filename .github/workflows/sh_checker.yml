@@ -1,0 +1,23 @@
+name: sh文件检查器
+on:
+  push:
+    paths: [ qbittorrent-nox-static.sh ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sh-checker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: 运行 sh-checker
+        uses: luizm/action-sh-checker@v0.7.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHELLCHECK_OPTS: -e SC2034,SC1091,SC2317,SC2154,SC2015 # 可以排除一些 shellcheck 警告。
+          SHFMT_OPTS: -ci -sr -i 0 # 可以将参数传递给 shftm
+        with:
+          sh_checker_comment: true
+          sh_checker_exclude: ""
