@@ -1,0 +1,357 @@
+diff -ruN a/src/base/bittorrent/torrentimpl.cpp b/src/base/bittorrent/torrentimpl.cpp
+--- a/src/base/bittorrent/torrentimpl.cpp	2024-03-24 07:58:40.000000000 +0800
++++ b/src/base/bittorrent/torrentimpl.cpp	2024-03-25 15:47:20.000000000 +0800
+@@ -414,7 +414,8 @@
+ 
+ QString TorrentImpl::currentTracker() const
+ {
+-    return QString::fromStdString(m_nativeStatus.current_tracker);
++    const QUrl url(QString::fromStdString(m_nativeStatus.current_tracker));
++    return url.host();
+ }
+ 
+ Path TorrentImpl::savePath() const
+diff -ruN a/src/lang/lang.qrc b/src/lang/lang.qrc
+--- a/src/lang/lang.qrc	2024-03-24 07:58:40.000000000 +0800
++++ b/src/lang/lang.qrc	2024-03-25 15:56:44.000000000 +0800
+@@ -1,60 +1,6 @@
+ <RCC>
+     <qresource prefix="/lang">
+-        <file>qbittorrent_az@latin.qm</file>
+-        <file>qbittorrent_ar.qm</file>
+-        <file>qbittorrent_be.qm</file>
+-        <file>qbittorrent_bg.qm</file>
+-        <file>qbittorrent_ca.qm</file>
+-        <file>qbittorrent_cs.qm</file>
+-        <file>qbittorrent_da.qm</file>
+-        <file>qbittorrent_de.qm</file>
+-        <file>qbittorrent_el.qm</file>
+         <file>qbittorrent_en.qm</file>
+-        <file>qbittorrent_en_AU.qm</file>
+-        <file>qbittorrent_en_GB.qm</file>
+-        <file>qbittorrent_eo.qm</file>
+-        <file>qbittorrent_es.qm</file>
+-        <file>qbittorrent_et.qm</file>
+-        <file>qbittorrent_eu.qm</file>
+-        <file>qbittorrent_fa.qm</file>
+-        <file>qbittorrent_fi.qm</file>
+-        <file>qbittorrent_fr.qm</file>
+-        <file>qbittorrent_gl.qm</file>
+-        <file>qbittorrent_he.qm</file>
+-        <file>qbittorrent_hi_IN.qm</file>
+-        <file>qbittorrent_hr.qm</file>
+-        <file>qbittorrent_hu.qm</file>
+-        <file>qbittorrent_hy.qm</file>
+-        <file>qbittorrent_id.qm</file>
+-        <file>qbittorrent_is.qm</file>
+-        <file>qbittorrent_it.qm</file>
+-        <file>qbittorrent_ja.qm</file>
+-        <file>qbittorrent_ka.qm</file>
+-        <file>qbittorrent_ko.qm</file>
+-        <file>qbittorrent_lt.qm</file>
+-        <file>qbittorrent_ltg.qm</file>
+-        <file>qbittorrent_lv_LV.qm</file>
+-        <file>qbittorrent_mn_MN.qm</file>
+-        <file>qbittorrent_ms_MY.qm</file>
+-        <file>qbittorrent_nb.qm</file>
+-        <file>qbittorrent_nl.qm</file>
+-        <file>qbittorrent_oc.qm</file>
+-        <file>qbittorrent_pl.qm</file>
+-        <file>qbittorrent_pt_BR.qm</file>
+-        <file>qbittorrent_pt_PT.qm</file>
+-        <file>qbittorrent_ro.qm</file>
+-        <file>qbittorrent_ru.qm</file>
+-        <file>qbittorrent_sk.qm</file>
+-        <file>qbittorrent_sl.qm</file>
+-        <file>qbittorrent_sr.qm</file>
+-        <file>qbittorrent_sv.qm</file>
+-        <file>qbittorrent_th.qm</file>
+-        <file>qbittorrent_tr.qm</file>
+-        <file>qbittorrent_uk.qm</file>
+-        <file>qbittorrent_uz@Latn.qm</file>
+-        <file>qbittorrent_vi.qm</file>
+         <file>qbittorrent_zh_CN.qm</file>
+-        <file>qbittorrent_zh_HK.qm</file>
+-        <file>qbittorrent_zh_TW.qm</file>
+     </qresource>
+ </RCC>
+diff -ruN a/src/webui/www/private/scripts/dynamicTable.js b/src/webui/www/private/scripts/dynamicTable.js
+--- a/src/webui/www/private/scripts/dynamicTable.js	2024-03-24 07:58:40.000000000 +0800
++++ b/src/webui/www/private/scripts/dynamicTable.js	2024-03-25 15:54:35.000000000 +0800
+@@ -909,34 +909,34 @@
+         Extends: DynamicTable,
+ 
+         initColumns: function() {
+-            this.newColumn('priority', '', '#', 30, true);
++            this.newColumn('priority', '', '#', 20, true);
+             this.newColumn('state_icon', 'cursor: default', '', 22, true);
+-            this.newColumn('name', '', 'QBT_TR(Name)QBT_TR[CONTEXT=TransferListModel]', 200, true);
+-            this.newColumn('size', '', 'QBT_TR(Size)QBT_TR[CONTEXT=TransferListModel]', 100, true);
+-            this.newColumn('total_size', '', 'QBT_TR(Total Size)QBT_TR[CONTEXT=TransferListModel]', 100, false);
+-            this.newColumn('progress', '', 'QBT_TR(Done)QBT_TR[CONTEXT=TransferListModel]', 85, true);
+-            this.newColumn('status', '', 'QBT_TR(Status)QBT_TR[CONTEXT=TransferListModel]', 100, true);
+-            this.newColumn('num_seeds', '', 'QBT_TR(Seeds)QBT_TR[CONTEXT=TransferListModel]', 100, true);
+-            this.newColumn('num_leechs', '', 'QBT_TR(Peers)QBT_TR[CONTEXT=TransferListModel]', 100, true);
+-            this.newColumn('dlspeed', '', 'QBT_TR(Down Speed)QBT_TR[CONTEXT=TransferListModel]', 100, true);
+-            this.newColumn('upspeed', '', 'QBT_TR(Up Speed)QBT_TR[CONTEXT=TransferListModel]', 100, true);
+-            this.newColumn('eta', '', 'QBT_TR(ETA)QBT_TR[CONTEXT=TransferListModel]', 100, true);
+-            this.newColumn('ratio', '', 'QBT_TR(Ratio)QBT_TR[CONTEXT=TransferListModel]', 100, true);
+-            this.newColumn('category', '', 'QBT_TR(Category)QBT_TR[CONTEXT=TransferListModel]', 100, true);
+-            this.newColumn('tags', '', 'QBT_TR(Tags)QBT_TR[CONTEXT=TransferListModel]', 100, true);
+-            this.newColumn('added_on', '', 'QBT_TR(Added On)QBT_TR[CONTEXT=TransferListModel]', 100, true);
+-            this.newColumn('completion_on', '', 'QBT_TR(Completed On)QBT_TR[CONTEXT=TransferListModel]', 100, false);
+-            this.newColumn('tracker', '', 'QBT_TR(Tracker)QBT_TR[CONTEXT=TransferListModel]', 100, false);
++            this.newColumn('name', '', 'QBT_TR(Name)QBT_TR[CONTEXT=TransferListModel]', 210, true);
++            this.newColumn('size', '', 'QBT_TR(Size)QBT_TR[CONTEXT=TransferListModel]', 60, true);
++            this.newColumn('tracker', '', 'QBT_TR(Tracker)QBT_TR[CONTEXT=TransferListModel]', 70, true);
++            this.newColumn('total_size', '', 'QBT_TR(Total Size)QBT_TR[CONTEXT=TransferListModel]', 80, false);
++            this.newColumn('progress', '', 'QBT_TR(Done)QBT_TR[CONTEXT=TransferListModel]', 80, true);
++            this.newColumn('status', '', 'QBT_TR(Status)QBT_TR[CONTEXT=TransferListModel]', 50, true);
++            this.newColumn('num_seeds', '', 'QBT_TR(Seeds)QBT_TR[CONTEXT=TransferListModel]', 65, true);
++            this.newColumn('num_leechs', '', 'QBT_TR(Peers)QBT_TR[CONTEXT=TransferListModel]', 65, true);
++            this.newColumn('dlspeed', '', 'QBT_TR(Down Speed)QBT_TR[CONTEXT=TransferListModel]', 65, true);
++            this.newColumn('eta', '', 'QBT_TR(ETA)QBT_TR[CONTEXT=TransferListModel]', 80, true);
++            this.newColumn('downloaded', '', 'QBT_TR(Downloaded)QBT_TR[CONTEXT=TransferListModel]', 70, false);
++            this.newColumn('upspeed', '', 'QBT_TR(Up Speed)QBT_TR[CONTEXT=TransferListModel]', 65, true);
++            this.newColumn('uploaded', '', 'QBT_TR(Uploaded)QBT_TR[CONTEXT=TransferListModel]', 70, false);
++            this.newColumn('ratio', '', 'QBT_TR(Ratio)QBT_TR[CONTEXT=TransferListModel]', 50, true);
++            this.newColumn('save_path', '', 'QBT_TR(Save path)QBT_TR[CONTEXT=TransferListModel]', 125, true);
++            this.newColumn('added_on', '', 'QBT_TR(Added On)QBT_TR[CONTEXT=TransferListModel]', 120, true);
++            this.newColumn('category', '', 'QBT_TR(Category)QBT_TR[CONTEXT=TransferListModel]', 55, false);
++            this.newColumn('tags', '', 'QBT_TR(Tags)QBT_TR[CONTEXT=TransferListModel]', 55, false);
++            this.newColumn('completion_on', '', 'QBT_TR(Completed On)QBT_TR[CONTEXT=TransferListModel]', 120, false);
+             this.newColumn('dl_limit', '', 'QBT_TR(Down Limit)QBT_TR[CONTEXT=TransferListModel]', 100, false);
+             this.newColumn('up_limit', '', 'QBT_TR(Up Limit)QBT_TR[CONTEXT=TransferListModel]', 100, false);
+-            this.newColumn('downloaded', '', 'QBT_TR(Downloaded)QBT_TR[CONTEXT=TransferListModel]', 100, false);
+-            this.newColumn('uploaded', '', 'QBT_TR(Uploaded)QBT_TR[CONTEXT=TransferListModel]', 100, false);
+-            this.newColumn('downloaded_session', '', 'QBT_TR(Session Download)QBT_TR[CONTEXT=TransferListModel]', 100, false);
+-            this.newColumn('uploaded_session', '', 'QBT_TR(Session Upload)QBT_TR[CONTEXT=TransferListModel]', 100, false);
+-            this.newColumn('amount_left', '', 'QBT_TR(Remaining)QBT_TR[CONTEXT=TransferListModel]', 100, false);
+-            this.newColumn('time_active', '', 'QBT_TR(Time Active)QBT_TR[CONTEXT=TransferListModel]', 100, false);
+-            this.newColumn('save_path', '', 'QBT_TR(Save path)QBT_TR[CONTEXT=TransferListModel]', 100, false);
+-            this.newColumn('completed', '', 'QBT_TR(Completed)QBT_TR[CONTEXT=TransferListModel]', 100, false);
++            this.newColumn('downloaded_session', '', 'QBT_TR(Session Download)QBT_TR[CONTEXT=TransferListModel]', 50, false);
++            this.newColumn('uploaded_session', '', 'QBT_TR(Session Upload)QBT_TR[CONTEXT=TransferListModel]', 50, false);
++            this.newColumn('amount_left', '', 'QBT_TR(Remaining)QBT_TR[CONTEXT=TransferListModel]', 50, false);
++            this.newColumn('time_active', '', 'QBT_TR(Time Active)QBT_TR[CONTEXT=TransferListModel]', 150, false);
++            this.newColumn('completed', '', 'QBT_TR(Completed)QBT_TR[CONTEXT=TransferListModel]', 50, false);
+             this.newColumn('max_ratio', '', 'QBT_TR(Ratio Limit)QBT_TR[CONTEXT=TransferListModel]', 100, false);
+             this.newColumn('seen_complete', '', 'QBT_TR(Last Seen Complete)QBT_TR[CONTEXT=TransferListModel]', 100, false);
+             this.newColumn('last_activity', '', 'QBT_TR(Last Activity)QBT_TR[CONTEXT=TransferListModel]', 100, false);
+@@ -1516,20 +1516,20 @@
+         Extends: DynamicTable,
+ 
+         initColumns: function() {
+-            this.newColumn('country', '', 'QBT_TR(Country/Region)QBT_TR[CONTEXT=PeerListWidget]', 22, true);
+-            this.newColumn('ip', '', 'QBT_TR(IP)QBT_TR[CONTEXT=PeerListWidget]', 80, true);
+-            this.newColumn('port', '', 'QBT_TR(Port)QBT_TR[CONTEXT=PeerListWidget]', 35, true);
+-            this.newColumn('connection', '', 'QBT_TR(Connection)QBT_TR[CONTEXT=PeerListWidget]', 50, true);
+-            this.newColumn('flags', '', 'QBT_TR(Flags)QBT_TR[CONTEXT=PeerListWidget]', 50, true);
++            this.newColumn('country', '', 'QBT_TR(Country/Region)QBT_TR[CONTEXT=PeerListWidget]', 65, true);
++            this.newColumn('ip', '', 'QBT_TR(IP)QBT_TR[CONTEXT=PeerListWidget]', 120, true);
++            this.newColumn('port', '', 'QBT_TR(Port)QBT_TR[CONTEXT=PeerListWidget]', 50, true);
++            this.newColumn('connection', '', 'QBT_TR(Connection)QBT_TR[CONTEXT=PeerListWidget]', 55, true);
++            this.newColumn('flags', '', 'QBT_TR(Flags)QBT_TR[CONTEXT=PeerListWidget]', 55, true);
+             this.newColumn('client', '', 'QBT_TR(Client)QBT_TR[CONTEXT=PeerListWidget]', 140, true);
+             this.newColumn('peer_id_client', '', 'QBT_TR(Peer ID Client)QBT_TR[CONTEXT=PeerListWidget]', 60, false);
+             this.newColumn('progress', '', 'QBT_TR(Progress)QBT_TR[CONTEXT=PeerListWidget]', 50, true);
+-            this.newColumn('dl_speed', '', 'QBT_TR(Down Speed)QBT_TR[CONTEXT=PeerListWidget]', 50, true);
+-            this.newColumn('up_speed', '', 'QBT_TR(Up Speed)QBT_TR[CONTEXT=PeerListWidget]', 50, true);
+-            this.newColumn('downloaded', '', 'QBT_TR(Downloaded)QBT_TR[CONTEXT=PeerListWidget]', 50, true);
++            this.newColumn('dl_speed', '', 'QBT_TR(Down Speed)QBT_TR[CONTEXT=PeerListWidget]', 75, true);
++            this.newColumn('up_speed', '', 'QBT_TR(Up Speed)QBT_TR[CONTEXT=PeerListWidget]', 75, true);
++            this.newColumn('downloaded', '', 'QBT_TR(Downloaded)QBT_TR[CONTEXT=PeerListWidget]', 65, true);
+             this.newColumn('uploaded', '', 'QBT_TR(Uploaded)QBT_TR[CONTEXT=PeerListWidget]', 50, true);
+-            this.newColumn('relevance', '', 'QBT_TR(Relevance)QBT_TR[CONTEXT=PeerListWidget]', 30, true);
+-            this.newColumn('files', '', 'QBT_TR(Files)QBT_TR[CONTEXT=PeerListWidget]', 100, true);
++            this.newColumn('relevance', '', 'QBT_TR(Relevance)QBT_TR[CONTEXT=PeerListWidget]', 65, true);
++            this.newColumn('files', '', 'QBT_TR(Files)QBT_TR[CONTEXT=PeerListWidget]', 130, true);
+ 
+             this.columns['country'].dataProperties.push('country_code');
+             this.columns['flags'].dataProperties.push('flags_desc');
+@@ -2288,10 +2288,10 @@
+ 
+         initColumns: function() {
+             this.newColumn('checked', '', '', 50, true);
+-            this.newColumn('name', '', 'QBT_TR(Name)QBT_TR[CONTEXT=TrackerListWidget]', 300, true);
++            this.newColumn('name', '', 'QBT_TR(Name)QBT_TR[CONTEXT=TrackerListWidget]', 350, true);
+             this.newColumn('size', '', 'QBT_TR(Total Size)QBT_TR[CONTEXT=TrackerListWidget]', 75, true);
+             this.newColumn('progress', '', 'QBT_TR(Progress)QBT_TR[CONTEXT=TrackerListWidget]', 100, true);
+-            this.newColumn('priority', '', 'QBT_TR(Download Priority)QBT_TR[CONTEXT=TrackerListWidget]', 150, true);
++            this.newColumn('priority', '', 'QBT_TR(Download Priority)QBT_TR[CONTEXT=TrackerListWidget]', 80, true);
+             this.newColumn('remaining', '', 'QBT_TR(Remaining)QBT_TR[CONTEXT=TrackerListWidget]', 75, true);
+             this.newColumn('availability', '', 'QBT_TR(Availability)QBT_TR[CONTEXT=TrackerListWidget]', 75, true);
+ 
+diff -ruN a/src/webui/www/translations/webui_translations.qrc b/src/webui/www/translations/webui_translations.qrc
+--- a/src/webui/www/translations/webui_translations.qrc	2024-03-24 07:58:40.000000000 +0800
++++ b/src/webui/www/translations/webui_translations.qrc	2024-03-25 15:55:55.000000000 +0800
+@@ -1,60 +1,6 @@
+ <RCC>
+     <qresource prefix="/www/translations">
+-        <file>webui_az@latin.qm</file>
+-        <file>webui_ar.qm</file>
+-        <file>webui_be.qm</file>
+-        <file>webui_bg.qm</file>
+-        <file>webui_ca.qm</file>
+-        <file>webui_cs.qm</file>
+-        <file>webui_da.qm</file>
+-        <file>webui_de.qm</file>
+-        <file>webui_el.qm</file>
+         <file>webui_en.qm</file>
+-        <file>webui_en_AU.qm</file>
+-        <file>webui_en_GB.qm</file>
+-        <file>webui_eo.qm</file>
+-        <file>webui_es.qm</file>
+-        <file>webui_et.qm</file>
+-        <file>webui_eu.qm</file>
+-        <file>webui_fa.qm</file>
+-        <file>webui_fi.qm</file>
+-        <file>webui_fr.qm</file>
+-        <file>webui_gl.qm</file>
+-        <file>webui_he.qm</file>
+-        <file>webui_hi_IN.qm</file>
+-        <file>webui_hr.qm</file>
+-        <file>webui_hu.qm</file>
+-        <file>webui_hy.qm</file>
+-        <file>webui_id.qm</file>
+-        <file>webui_is.qm</file>
+-        <file>webui_it.qm</file>
+-        <file>webui_ja.qm</file>
+-        <file>webui_ka.qm</file>
+-        <file>webui_ko.qm</file>
+-        <file>webui_lt.qm</file>
+-        <file>webui_ltg.qm</file>
+-        <file>webui_lv_LV.qm</file>
+-        <file>webui_mn_MN.qm</file>
+-        <file>webui_ms_MY.qm</file>
+-        <file>webui_nb.qm</file>
+-        <file>webui_nl.qm</file>
+-        <file>webui_oc.qm</file>
+-        <file>webui_pl.qm</file>
+-        <file>webui_pt_BR.qm</file>
+-        <file>webui_pt_PT.qm</file>
+-        <file>webui_ro.qm</file>
+-        <file>webui_ru.qm</file>
+-        <file>webui_sk.qm</file>
+-        <file>webui_sl.qm</file>
+-        <file>webui_sr.qm</file>
+-        <file>webui_sv.qm</file>
+-        <file>webui_th.qm</file>
+-        <file>webui_tr.qm</file>
+-        <file>webui_uk.qm</file>
+-        <file>webui_uz@Latn.qm</file>
+-        <file>webui_vi.qm</file>
+         <file>webui_zh_CN.qm</file>
+-        <file>webui_zh_HK.qm</file>
+-        <file>webui_zh_TW.qm</file>
+     </qresource>
+ </RCC>
+diff -ruN a/src/webui/www/translations/webui_zh_CN.ts b/src/webui/www/translations/webui_zh_CN.ts
+--- a/src/webui/www/translations/webui_zh_CN.ts	2024-01-15 07:45:17.000000000 +0800
++++ b/src/webui/www/translations/webui_zh_CN.ts	2024-02-06 14:36:22.314182110 +0800
+@@ -1894,11 +1894,11 @@
+     <name>PropTabBar</name>
+     <message>
+         <source>General</source>
+-        <translation>普通</translation>
++        <translation>常规</translation>
+     </message>
+     <message>
+         <source>Trackers</source>
+-        <translation>Tracker</translation>
++        <translation>服务器</translation>
+     </message>
+     <message>
+         <source>Peers</source>
+@@ -1910,7 +1910,7 @@
+     </message>
+     <message>
+         <source>Content</source>
+-        <translation>内容</translation>
++        <translation>文件</translation>
+     </message>
+ </context>
+ <context>
+@@ -2379,7 +2379,7 @@
+     <message>
+         <source>Done</source>
+         <comment>% Done</comment>
+-        <translation>已完成</translation>
++        <translation>进度</translation>
+     </message>
+     <message>
+         <source>Status</source>
+@@ -2389,12 +2389,12 @@
+     <message>
+         <source>Seeds</source>
+         <comment>i.e. full sources (often untranslated)</comment>
+-        <translation>种子</translation>
++        <translation>活跃|种子</translation>
+     </message>
+     <message>
+         <source>Peers</source>
+         <comment>i.e. partial sources (often untranslated)</comment>
+-        <translation>用户</translation>
++        <translation>活跃|用户</translation>
+     </message>
+     <message>
+         <source>Down Speed</source>
+@@ -2409,7 +2409,7 @@
+     <message>
+         <source>Ratio</source>
+         <comment>Share ratio</comment>
+-        <translation>比率</translation>
++        <translation>分享率</translation>
+     </message>
+     <message>
+         <source>ETA</source>
+@@ -2436,7 +2436,7 @@
+     </message>
+     <message>
+         <source>Tracker</source>
+-        <translation>Tracker</translation>
++        <translation>服务器</translation>
+     </message>
+     <message>
+         <source>Down Limit</source>
+@@ -2481,7 +2481,7 @@
+     <message>
+         <source>Save path</source>
+         <comment>Torrent save path</comment>
+-        <translation>保存路径</translation>
++        <translation>保存目录</translation>
+     </message>
+     <message>
+         <source>Completed</source>
+@@ -2648,7 +2648,7 @@
+     </message>
+     <message>
+         <source>Paused</source>
+-        <translation>暂停</translation>
++        <translation>已暂停</translation>
+     </message>
+     <message>
+         <source>Completed</source>
+@@ -2664,11 +2664,11 @@
+     </message>
+     <message>
+         <source>Seeding</source>
+-        <translation>做种</translation>
++        <translation>做种中</translation>
+     </message>
+     <message>
+         <source>Queued</source>
+-        <translation>排队</translation>
++        <translation>排队中</translation>
+     </message>
+     <message>
+         <source>Errored</source>
+@@ -2731,7 +2731,7 @@
+     </message>
+     <message>
+         <source>Trackers</source>
+-        <translation>Tracker</translation>
++        <translation>服务器分布</translation>
+     </message>
+     <message>
+         <source>Collapse/expand</source>
