@@ -137,7 +137,7 @@ jobs:
 
       - name: 上传到 Artifacts ${{github.event.inputs.distinct_id}}
         if: steps.compile.conclusion == 'success' && !cancelled()
-        uses: actions/upload-artifact@v4.3.1
+        uses: actions/upload-artifact@v4.3.3
         with:
           name: libtorrent-v${{matrix.qbt_libtorrent_version}}-${{matrix.qbt_cross_name}}-${{matrix.qbt_qt_version_name}}qBittorrent-nox
           path: |
@@ -146,7 +146,7 @@ jobs:
 
       - name: graphs 上传到 Artifacts ${{github.event.inputs.distinct_id}}
         if: matrix.qbt_build_tool == 'cmake' && steps.compile.conclusion == 'success' && !cancelled()
-        uses: actions/upload-artifact@v4.3.1
+        uses: actions/upload-artifact@v4.3.3
         with:
           name: "${{matrix.qbt_cross_name}}-libtorrent-v${{matrix.qbt_libtorrent_version}}-graphs"
           path: "${{env.qbt_build_dir}}/completed/*.png"
