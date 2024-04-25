@@ -178,7 +178,7 @@ jobs:
         uses: actions/checkout@v4.1.2
 
       - name: 下载 qBittorrent-nox 文件 ${{github.event.inputs.distinct_id}}
-        uses: actions/download-artifact@v4.1.6
+        uses: actions/download-artifact@v4.1.7
 
       - name: 整理发布内容 ${{github.event.inputs.distinct_id}}
         id: releases
