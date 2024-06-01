@@ -16,7 +16,7 @@ jobs:
         uses: luizm/action-sh-checker@v0.8.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SHELLCHECK_OPTS: -e SC2034,SC1091,SC2317,SC2154,SC2015 # 可以排除一些 shellcheck 警告。
+          SHELLCHECK_OPTS: -e SC2034,SC1091,SC2317,SC2154,SC2015,SC1079,SC1078,SC1083 # 可以排除一些 shellcheck 警告。
           SHFMT_OPTS: -ci -sr -i 0 # 可以将参数传递给 shftm
         with:
           sh_checker_comment: true

@@ -88,7 +88,7 @@ os_version_id="$(get_os_info VERSION_ID)"                                       
 # 检查允许的代号或者代号是否是大于 3.10 的 alpine 版本
 if [[ ! "${os_version_codename}" =~ ^(alpine|bullseye|bookworm|focal|jammy|noble)$ ]] || [[ "${os_version_codename}" =~ ^(alpine)$ && "${os_version_id//\./}" -lt "${alpine_min_version:-3100}" ]]; then
 	printf '\n%b\n\n' " ${unicode_red_circle} ${color_yellow} 这不是受支持的操作系统。没有理由继续。${color_end}"
-	printf '%b\n\n' " id: ${text_dim}${color_yellow_light}${os_id}${color_end} 代号: ${text_dim}${color_yellow_light}${os_version_codename}${color_end} 版本: ${ text_dim}${color_red_light}${os_version_id}${color_end}"
+	printf '%b\n\n' " id: ${text_dim}${color_yellow_light}${os_id}${color_end} 代号: ${text_dim}${color_yellow_light}${os_version_codename}${color_end} 版本: ${text_dim}${color_red_light}${os_version_id}${color_end}"
 	printf '%b\n\n' " ${unicode_yellow_circle} ${text_dim}这些是支持的平台${color_end}"
 	printf '%b\n' " ${color_magenta_light}Debian${color_end} - ${color_blue_light}bullseye${color_end} - ${color_blue_light}bookworm${color_end}"
 	printf '%b\n' " ${color_magenta_light}Ubuntu${color_end} - ${color_blue_light}focal${color_end} - ${color_blue_light}jammy${color_end} - ${color_blue_light}noble${color_end}"
@@ -1050,7 +1050,7 @@ _apply_patches() {
 		_patch_url() {
 			patch_url="$(< "${patch_url_file}")"
 			if _curl --create-dirs "${patch_url}" -o "${patch_file}"; then
-				printf '%b\n\n' " ${unicode_green_circle} ${color_red}从 ${color_red_light}remote:url${color_end} - ${color_magenta_light}${app_name}${color_end} 修补${color_end} ${ color_yellow_light}${app_version[${app_name}]}${color_end} - ${color_yellow_light}${patch_url}${color_end}"
+				printf '%b\n\n' " ${unicode_green_circle} ${color_red}从 ${color_red_light}remote:url${color_end} - ${color_magenta_light}${app_name}${color_end} 修补${color_end} ${color_yellow_light}${app_version[${app_name}]}${color_end} - ${color_yellow_light}${patch_url}${color_end}"
 			fi
 		}
 
