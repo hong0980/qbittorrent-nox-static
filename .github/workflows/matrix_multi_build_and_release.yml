@@ -45,7 +45,7 @@ jobs:
         os_id: [alpine]
         os_version_id: [edge]
         # qbt_cross_name: [armel,armhf,armv7,aarch64,x86_64,x86,s390x,powerpc,ppc64el,mips,mipsel,mips64,mips64el,riscv64]
-        qbt_cross_name: ["armhf", "armv7", "aarch64", "x86_64"]
+        qbt_cross_name: ["armhf", "armv7", "aarch64", "x86_64", "x86"]
         qbt_libtorrent_version: ["1.2", "2.0"]
         qbt_build_tool: ["", "cmake"]
         include:
@@ -65,14 +65,13 @@ jobs:
       - name: Checkout ${{github.event.inputs.distinct_id}}
         uses: actions/checkout@v4.1.2
 
-      - name: Host - 初始环境 ${{github.event.inputs.distinct_id}}
+      - name: Host - 部署 ${{github.event.inputs.distinct_id}}
         run: |
-          echo 'APT::Get::Always-Include-Phased-Updates "false";' | sudo tee /etc/apt/apt.conf.d/99-phased-updates
           echo -e 'Package: *\nPin: release n=lunar\nPin-Priority: 50' | sudo tee /etc/apt/preferences
+          echo 'APT::Get::Always-Include-Phased-Updates "false";' | sudo tee /etc/apt/apt.conf.d/99-phased-updates
           echo 'deb http://archive.ubuntu.com/ubuntu/ lunar main universe restricted' | sudo tee /etc/apt/sources.list.d/lunar.list
-          sudo apt-get -qq update
-          sudo apt-get -qq -y upgrade
-          sudo apt-get -qq install -t lunar libpipeline1 qemu-user-static binfmt-support
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install lunar libpipeline1 qemu-user-static binfmt-support
           echo "qbt_libtorrent_version=${{matrix.qbt_libtorrent_version}}" > env.custom
           echo "qbt_qt_version=${{matrix.qbt_qt_version}}" >> env.custom
           echo "qbt_build_tool=${{matrix.qbt_build_tool}}" >> env.custom
@@ -96,11 +95,11 @@ jobs:
           docker exec -w /root multiarch apk update
           docker exec -w /root multiarch apk add bash tzdata
 
-      - name: Docker - Bootstrap ${{github.event.inputs.distinct_id}}
-        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh -bs-a
-
-      - name: Docker - Copy repo patches to build folder ${{github.event.inputs.distinct_id}}
-        run: if [[ -d patches ]]; then docker exec -w /root multiarch cp -r patches/* /root/${{env.qbt_build_dir}}/patches; fi
+      - name: Docker - 初始环境 ${{github.event.inputs.distinct_id}}
+        run: |
+          docker exec -w /root multiarch bash qbittorrent-nox-static.sh -bs-a
+          if [[ -d patches ]]; then docker exec -w /root multiarch cp -vr patches/* /root/${{env.qbt_build_dir}}/patches; fi
+          if [[ -f ${{env.qbt_build_dir}}/release_info/disable-qt5 ]]; then echo "disable_qt5=yes" >> $GITHUB_ENV fi
 
       - name: Docker - zlib-ng ${{github.event.inputs.distinct_id}}
         run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh zlib
@@ -134,13 +133,6 @@ jobs:
       - name: Docker - qbittorrent ${{github.event.inputs.distinct_id}}
         run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh qbittorrent
 
-      - name: Host - qBittorrent v5 transition
-        run: |
-          # When qBittorrent v5 is released, remove this
-          if [[ -f ${{env.qbt_build_dir}}/release_info/disable-qt5 ]]; then
-            echo "disable_qt5=yes" >> $GITHUB_ENV
-          fi
-
       - name: Docker - 设置发布名称 ${{github.event.inputs.distinct_id}}
         if: env.disable_qt5 != 'yes' # 当qBittorrent v5发布时，删除这个
         run: |
@@ -152,7 +144,7 @@ jobs:
       #     docker exec -w /root multiarch apk add upx
       #     docker exec -w /root/${{env.qbt_build_dir}}/completed multiarch upx --brute --no-lzma ${{matrix.qbt_cross_name}}-${{matrix.qbt_qt_version_name}}qbittorrent-nox
 
-      - name: Host - 上传 libtorrent-v${{matrix.qbt_libtorrent_version}}-qbittorrent-nox 并发布信息工件${{github.event.inputs.distinct_id}}
+      - name: Host - 上传 libtorrent-v${{matrix.qbt_libtorrent_version}}-qbittorrent-nox 并发布 ${{github.event.inputs.distinct_id}}
         if: env.disable_qt5 != 'yes' # 当qBittorrent v5发布时，删除这个
         uses: actions/upload-artifact@v4.3.1
         with:
@@ -185,7 +177,7 @@ jobs:
           - qbt_libtorrent_version: "2.0"
             preview_release: false
 
-    name: "Publish release libtorrent-v${{matrix.qbt_libtorrent_version}}"
+    name: "发布 libtorrent-v${{matrix.qbt_libtorrent_version}}"
 
     env:
       qbt_build_dir: "qbt-build"
@@ -246,13 +238,13 @@ jobs:
           ./pandoc --wrap=preserve -f gfm tmp-release.md -t gfm -o release.md
           echo "release_tag=$(cat ${{matrix.qbt_libtorrent_version}}/tag.md)" >> $GITHUB_ENV
           echo "release_title=$(cat ${{matrix.qbt_libtorrent_version}}/title.md)" >> $GITHUB_ENV
-          ls -Ah --full-time --group-directories-first ${{matrix.qbt_libtorrent_version}}
+          # ls -Ah --full-time --group-directories-first ${{matrix.qbt_libtorrent_version}}
 
       - name: Host- 创建 标签 ${{github.event.inputs.distinct_id}}
         uses: ncipollo/release-action@v1.14.0
         with:
           prerelease: "${{matrix.preview_release}}"
-          artifacts: "${{matrix.qbt_libtorrent_version}}/*-qbittorrent-nox,dependency-version.json"
+          artifacts: "${{matrix.qbt_libtorrent_version}}/*-qbittorrent-nox,*dependency-version.json"
           replacesArtifacts: true
           tag: "${{env.release_tag}}"
           name: "${{env.release_title}}"

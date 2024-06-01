@@ -14,21 +14,21 @@
 #
 # Script Formatting - https://marketplace.visualstudio.com/items?itemName=foxundermoon.shell-format
 #
-#################################################################################################################################################
+
 # Script version = Major minor patch
-#################################################################################################################################################
+
 script_version="2.0.9"
-#################################################################################################################################################
-# Set some script features - https://www.gnu.org/software/bash/manual/html_node/The-Set-Builtin.html
-#################################################################################################################################################
+
+# 设置一些脚本功能 - https://www.gnu.org/software/bash/manual/html_node/The-Set-Builtin.html
+
 set -a
-#################################################################################################################################################
-# Unset some variables to set defaults.
-#################################################################################################################################################
+
+# 取消设置一些变量以设置默认值。
+
 unset qbt_skip_delete qbt_git_proxy qbt_curl_proxy qbt_install_dir qbt_build_dir qbt_working_dir qbt_modules_test qbt_python_version
-#################################################################################################################################################
-# Color me up Scotty - define some color values to use as variables in the scripts.
-#################################################################################################################################################
+
+# Color me up Scotty - 定义一些颜色值以用作脚本中的变量。
+
 color_red="\e[31m" color_red_light="\e[91m"
 color_green="\e[32m" color_green_light="\e[92m"
 color_yellow="\e[33m" color_yellow_light="\e[93m"
@@ -48,9 +48,9 @@ unicode_grey_circle="\e[37m\U2B24\e[0m" unicode_grey_light_circle="\e[97m\U2B24\
 
 color_end="\e[0m"
 
-# Function to test color and show outputs in the terminal
+# 测试颜色并在终端中显示输出的功能
 _color_test() {
-	# Check if the terminal supports color output
+	# 检查终端是否支持彩色输出
 	if [[ -t 1 ]]; then
 		colour_array=("${color_red}red" "${color_red_light}light red" "${color_green}green" "${color_green_light}light green" "${color_yellow}yellow" "${color_yellow_light}light yellow" "${color_blue}blue" "${color_blue_light}ligh blue" "${color_magenta}magenta" "${color_magenta_light}light magenta" "${color_cyan}cyan" "${color_cyan_light}light cyan")
 		formatting_array=("${text_bold}Text Bold" "${text_dim}Text Dim" "${text_underlined}Text Underline" "${text_newline}New line" "${text_blink}Text Blink")
@@ -67,10 +67,10 @@ _color_test() {
 	fi
 }
 [[ "${1}" == "ctest" ]] && _color_test # ./scriptname.sh ctest
-#######################################################################################################################################################
-# Check we are on a supported OS and release.
-#######################################################################################################################################################
-get_os_info() { # Function to source /etc/os-release and get info from it on demand.
+
+# 检查我们使用的是受支持的操作系统和版本。
+
+get_os_info() { # 获取 /etc/os-release 的函数并根据需要从中获取信息。
 	# shellcheck source=/dev/null
 	if source /etc/os-release &> /dev/null; then
 		printf "%s" "${!1%_*}" # 扩展部分特定于 Alpine VERSION_ID 格式 1.2.3_alpha，但不会破坏基于 Debian 的格式中的任何内容。 2004年12月24日
@@ -95,17 +95,17 @@ if [[ ! "${os_version_codename}" =~ ^(alpine|bullseye|bookworm|focal|jammy|noble
 	printf '%b\n\n' " ${color_magenta_light}Alpine${color_end} - ${color_blue_light}3.10.0${color_end} ${text_dim}或更高版本${color_end}"
 	exit 1
 fi
-#######################################################################################################################################################
+
 # 从文件中获取环境变量（如果存在），但它将被传递给脚本的开关和标志覆盖
-#######################################################################################################################################################
+
 if [[ -f "${PWD}/.qbt_env" ]]; then
 	printf '\n%b\n' " ${unicode_magenta_circle} Sourcing .qbt_env file"
 	# shellcheck source=/dev/null
 	source "${PWD}/.qbt_env"
 fi
-#######################################################################################################################################################
+
 # Multi arch stuff
-#######################################################################################################################################################
+
 # 定义我们使用的所有可用的多拱门 https://github.com/userdocs/qbt-musl-cross-make#readme
 declare -gA multi_arch_options
 multi_arch_options[default]="skip"
@@ -123,9 +123,9 @@ multi_arch_options[mipsel]="mipsel"
 multi_arch_options[mips64]="mips64"
 multi_arch_options[mips64el]="mips64el"
 multi_arch_options[riscv64]="riscv64"
-#######################################################################################################################################################
+
 # 该函数设置了我们使用的一些默认值，但其值可以在运行脚本之前被某些标志覆盖或导出为变量
-#######################################################################################################################################################
+
 _set_default_values() {
 	# docker 部署不会提示设置时区。
 	export DEBIAN_FRONTEND="noninteractive"
@@ -318,9 +318,9 @@ _set_default_values() {
 	# 在我们隔离脚本之前，通过在 _set_build_directory 函数中将 HOME 设置为安装目录来获取本地用户 $PATH。
 	qbt_local_paths="$PATH"
 }
-#######################################################################################################################################################
+
 # 该函数将从 qbt_required_pkgs 数组中检查已定义依赖项的列表。像 python3-dev 这样的应用程序是动态设置的
-#######################################################################################################################################################
+
 _check_dependencies() {
 	printf '\n%b\n\n' " ${unicode_blue_light_circle} ${text_bold}检查是否安装了所需的核心依赖${color_end}"
 
@@ -419,17 +419,17 @@ _check_dependencies() {
 		printf '\n%b\n' " ${unicode_green_circle}${text_bold} 所有依赖均已通过，继续构建${color_end}"
 	fi
 }
-#######################################################################################################################################################
+
 # 该函数将版本字符串转换为数字以进行比较。
-#######################################################################################################################################################
+
 _semantic_version() {
 	local test_array
 	read -ra test_array < <(printf "%s" "${@//./ }")
 	printf "%d%03d%03d%03d" "${test_array[@]}"
 }
-#######################################################################################################################################################
+
 # _print_env
-#######################################################################################################################################################
+
 _print_env() {
 	printf '\n%b\n\n' " ${unicode_yellow_circle} 默认环境变量${color_end}"
 	printf '%b\n' " ${color_yellow_light}  qbt_libtorrent_version=\"${color_green_light}${qbt_libtorrent_version}${color_yellow_light}\"${color_end}"
@@ -451,9 +451,9 @@ _print_env() {
 	printf '%b\n' " ${color_yellow_light}  qbt_standard=\"${color_green_light}${qbt_standard}${color_yellow_light}\"${color_end}"
 	printf '%b\n\n' " ${color_yellow_light}  qbt_static_ish=\"${color_green_light}${qbt_static_ish}${color_yellow_light}\"${color_end}"
 }
-#######################################################################################################################################################
-# These functions set the cxx standard dynmically based on the libtorrent versions, qt version and qbittorrent combinations
-#######################################################################################################################################################
+
+# 这些函数根据 libtorrent 版本、qt 版本和 qbittorrent 组合动态设置 cxx 标准
+
 _qt_std_cons() {
 	[[ "${qbt_qt_version}" == "6" ]] && cxx_check="yes"
 	printf '%s' "${cxx_check:-no}"
@@ -480,9 +480,9 @@ _set_cxx_standard() {
 	fi
 }
 
-#######################################################################################################################################################
+
 # 这些函数根据 libtorrent 版本、qt 版本和 qbittorrent 组合动态设置一些构建条件
-#######################################################################################################################################################
+
 _qbittorrent_build_cons() {
 	[[ "${github_tag[qbittorrent]}" == "master" ]] && disable_qt5="yes"
 	[[ "${github_tag[qbittorrent]}" == "v5_0_x" ]] && disable_qt5="yes"
@@ -497,18 +497,18 @@ _set_build_cons() {
 		exit                                                                                # 非错误退出不会扰乱 github 操作 - 只需跳过该步骤
 	fi
 }
-#######################################################################################################################################################
+
 # 这是一个命令测试函数：_cmd exit 1
-#######################################################################################################################################################
+
 _cmd() {
 	if ! "${@}"; then
 		printf '\n%b\n\n' " 命令：${color_red_light}${*}${color_end} 失败"
 		exit 1
 	fi
 }
-#######################################################################################################################################################
-# This is a command test function to test build commands for failure
-#######################################################################################################################################################
+
+# 这是一个命令测试功能，用于测试构建命令是否失败
+
 _post_command() {
 	outcome=("${PIPESTATUS[@]}")
 	[[ -n "${1}" ]] && command_type="${1}"
@@ -519,9 +519,9 @@ _post_command() {
 		exit 1
 	fi
 }
-#######################################################################################################################################################
-# This function is to test a directory exists before attempting to cd and fail with and exit code if it doesn't.
-#######################################################################################################################################################
+
+# 此功能是在尝试 cd 之前测试目录是否存在，如果不存在，则失败并退出代码。
+
 _pushd() {
 	if ! pushd "$@" &> /dev/null; then
 		printf '\n%b\n' "该目录不存在。有问题"
@@ -536,26 +536,26 @@ _popd() {
 		exit 1
 	fi
 }
-#######################################################################################################################################################
+
 # 该函数确保 tee 所需的日志目录和路径存在
-#######################################################################################################################################################
+
 _tee() {
 	[[ "$#" -eq 1 && "${1%/*}" =~ / ]] && mkdir -p "${1%/*}"
 	[[ "$#" -eq 2 && "${2%/*}" =~ / ]] && mkdir -p "${2%/*}"
 	command tee "$@"
 }
-#######################################################################################################################################################
-# error functions
-#######################################################################################################################################################
+
+# 误差函数
+
 _error_tag() {
 	[[ "${github_tag[*]}" =~ error_tag ]] && {
 		printf '\n'
 		exit
 	}
 }
-#######################################################################################################################################################
+
 # _curl 测试下载功能 - 默认无代理 - _curl 是测试功能，_curl_curl 是命令功能
-#######################################################################################################################################################
+
 _curl_curl() {
 	"$(type -P curl)" -sNL4fq --connect-timeout 5 --retry 5 --retry-delay 5 --retry-max-time 25 "${qbt_curl_proxy[@]}" "${@}"
 }
@@ -565,9 +565,9 @@ _curl() {
 		return 1
 	fi
 }
-#######################################################################################################################################################
+
 # git test 下载功能 - 默认无代理 - git 是测试功能，_git_git 是命令功能
-#######################################################################################################################################################
+
 _git_git() {
 	"$(type -P git)" "${qbt_git_proxy[@]}" "${@}"
 }
@@ -607,9 +607,9 @@ _test_git_ouput() {
 		printf '\n%b\n' " ${text_blink}${unicode_red_light_circle}${color_end} ${color_yellow}提供的${2}标签${color_red}${3}${color_end}${color_yellow}为无效${color_end}"
 	fi
 }
-#######################################################################################################################################################
-# Boost URL test function
-#######################################################################################################################################################
+
+# Boost URL测试功能
+
 _boost_url() {
 	if [[ "${github_tag[boost]}" =~ \.beta ]]; then
 		local boost_asset="${github_tag[boost]/\.beta/\.b}"
@@ -636,9 +636,9 @@ _boost_url() {
 		fi
 	done
 }
-#######################################################################################################################################################
+
 # Debug stuff
-#######################################################################################################################################################
+
 _debug() {
 	if [[ "${script_debug_urls}" == "yes" ]]; then
 		mapfile -t github_url_sorted < <(printf '%s\n' "${!github_url[@]}" | sort)
@@ -685,9 +685,9 @@ _debug() {
 		exit
 	fi
 }
-#######################################################################################################################################################
+
 # 该函数全局设置一些编译器标志 - b2 设置在 _installation_modules 函数中设置的 ~/user-config.jam 中设置
-#######################################################################################################################################################
+
 _custom_flags_set() {
 	CXXFLAGS="${qbt_optimize/*/${qbt_optimize} }-std=${qbt_cxx_standard} ${qbt_ldflags_static} -w -Wno-psabi -I${include_dir}"
 	CPPFLAGS="${qbt_optimize/*/${qbt_optimize} }${qbt_ldflags_static} -w -Wno-psabi -I${include_dir}"
@@ -699,9 +699,9 @@ _custom_flags_reset() {
 	CPPFLAGS="${qbt_optimize/*/${qbt_optimize} } -w"
 	LDFLAGS=""
 }
-#######################################################################################################################################################
+
 # 此函数将完整的 qbittorrent-nox 静态版本安装到 root 的 /usr/local/bin 或非 root 的 ${HOME}/bin
-#######################################################################################################################################################
+
 _install_qbittorrent() {
 	if [[ -f "${qbt_install_dir}/completed/qbittorrent-nox" ]]; then
 		if [[ "$(id -un)" == 'root' ]]; then
@@ -723,9 +723,9 @@ _install_qbittorrent() {
 		exit
 	fi
 }
-#######################################################################################################################################################
-# Script Version check
-#######################################################################################################################################################
+
+# 脚本版本检查
+
 _script_version() {
 	script_version_remote="$(_curl -sL "${script_url}" | sed -rn 's|^script_version="(.*)"$|\1|p')"
 
@@ -738,9 +738,9 @@ _script_version() {
 		printf '\n%b\n' " ${unicode_green_circle} 脚本版本: ${color_green_light}${script_version}${color_end}"
 	fi
 }
-#######################################################################################################################################################
-# URL test for normal use and proxy use - make sure we can reach google.com before processing the URL functions
-#######################################################################################################################################################
+
+# 正常使用和代理使用的 URL 测试 - 确保我们在处理 URL 函数之前可以访问 google.com
+
 _test_url() {
 	test_url_status="$(_curl -o /dev/null --head --write-out '%{http_code}' "https://github.com")"
 	if [[ "${test_url_status}" -eq "200" ]]; then
@@ -750,10 +750,10 @@ _test_url() {
 		exit
 	fi
 }
-#######################################################################################################################################################
-# This function sets the build and installation directory. If the argument -b is used to set a build directory that directory is set and used.
-# If nothing is specified or the switch is not used it defaults to the hard-coded path relative to the scripts location - qbittorrent-build
-#######################################################################################################################################################
+
+# 该函数设置构建和安装目录。如果参数 -b 用于设置构建目录，则设置并使用该目录。
+# 如果未指定任何内容或未使用开关，则默认为相对于脚本位置的硬编码路径 - qbittorrent-build
+
 _set_build_directory() {
 	if [[ -n "${qbt_build_dir}" ]]; then
 		if [[ "${qbt_build_dir}" =~ ^/ ]]; then
@@ -765,29 +765,28 @@ _set_build_directory() {
 		fi
 	fi
 
-	# Set lib and include directory paths based on install path.
+	# 根据安装路径设置 lib 和 include 目录路径。
 	include_dir="${qbt_install_dir}/include"
 	lib_dir="${qbt_install_dir}/lib"
 
-	# Define some build specific variables
-	LOCAL_USER_HOME="${HOME}" # Get the local user's home dir path before we contain HOME to the build dir.
+	# 定义一些构建特定的变量
+	LOCAL_USER_HOME="${HOME}" # 在将 HOME 包含到构建目录之前，获取本地用户的主目录路径。
 	HOME="${qbt_install_dir}"
 	PATH="${qbt_install_dir}/bin${PATH:+:${qbt_local_paths}}"
 	PKG_CONFIG_PATH="${lib_dir}/pkgconfig"
 }
-#######################################################################################################################################################
-# This function is where we set your URL and github tag info that we use with other functions.
-#######################################################################################################################################################
+
+# 此函数是我们设置与其他函数一起使用的 URL 和 github 标签信息的地方。
+
 _set_module_urls() {
-	# Update check url for the _script_version function
+	# 更新 _script_version 函数的检查 url
 	script_url="https://raw.githubusercontent.com/userdocs/qbittorrent-nox-static/master/qbittorrent-nox-static.sh"
-	##########################################################################################################################################################
-	# Create all the arrays now
-	##########################################################################################################################################################
+
+	# 现在创建所有数组
 	declare -gA github_url github_tag app_version source_archive_url qbt_workflow_archive_url qbt_workflow_override source_default
-	##########################################################################################################################################################
-	# Configure the github_url associative array for all the applications this script uses and we call them as ${github_url[app_name]}
-	##########################################################################################################################################################
+
+	# 为该脚本使用的所有应用程序配置 github_url 关联数组，我们将它们称为 ${github_url[app_name]}
+
 	if [[ "${os_id}" =~ ^(debian|ubuntu)$ ]]; then
 		github_url[cmake_ninja]="https://github.com/userdocs/qbt-cmake-ninja-crossbuilds.git"
 		github_url[glibc]="https://sourceware.org/git/glibc.git"
@@ -804,9 +803,9 @@ _set_module_urls() {
 	github_url[qtbase]="https://github.com/qt/qtbase.git"
 	github_url[qttools]="https://github.com/qt/qttools.git"
 	github_url[qbittorrent]="https://github.com/qbittorrent/qBittorrent.git"
-	##########################################################################################################################################################
-	# Configure the github_tag associative array for all the applications this script uses and we call them as ${github_tag[app_name]}
-	##########################################################################################################################################################
+
+	# 为该脚本使用的所有应用程序配置 github_tag 关联数组，我们将它们称为 ${github_tag[app_name]}
+
 	if [[ "${os_id}" =~ ^(debian|ubuntu)$ ]]; then
 		github_tag[cmake_ninja]="$(_git_git ls-remote -q -t --refs "${github_url[cmake_ninja]}" | awk '{sub("refs/tags/", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
 		if [[ "${os_version_codename}" =~ ^(bullseye|focal)$ ]]; then
@@ -830,9 +829,9 @@ _set_module_urls() {
 	github_tag[qtbase]="$(_git_git ls-remote -q -t --refs "${github_url[qtbase]}" | awk '/'"v${qbt_qt_version}"'/{sub("refs/tags/", "");sub("(.*)(-a|-b|-r)", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
 	github_tag[qttools]="$(_git_git ls-remote -q -t --refs "${github_url[qttools]}" | awk '/'"v${qbt_qt_version}"'/{sub("refs/tags/", "");sub("(.*)(-a|-b|-r)", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
 	github_tag[qbittorrent]="$(_git_git ls-remote -q -t --refs "${github_url[qbittorrent]}" | awk '{sub("refs/tags/", "");sub("(.*)(-[^0-9].*|rc|alpha|beta)(.*)", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
-	##########################################################################################################################################################
-	# Configure the app_version associative array for all the applications this script uses and we call them as ${app_version[app_name]}
-	##########################################################################################################################################################
+
+	# 为该脚本使用的所有应用程序配置 app_version 关联数组，我们将它们称为 ${app_version[app_name]}
+
 	if [[ "${os_id}" =~ ^(debian|ubuntu)$ ]]; then
 		app_version[cmake_debian]="${github_tag[cmake_ninja]%_*}"
 		app_version[ninja_debian]="${github_tag[cmake_ninja]#*_}"
@@ -851,9 +850,9 @@ _set_module_urls() {
 	app_version[qtbase]="$(printf '%s' "${github_tag[qtbase]#v}" | sed 's/-lts-lgpl//g')"
 	app_version[qttools]="$(printf '%s' "${github_tag[qttools]#v}" | sed 's/-lts-lgpl//g')"
 	app_version[qbittorrent]="${github_tag[qbittorrent]#release-}"
-	##########################################################################################################################################################
+
 	# 为该脚本使用的所有应用程序配置 source_archive_url 关联数组，我们将它们称为 ${source_archive_url[app_name]}
-	##########################################################################################################################################################
+
 	if [[ "${os_id}" =~ ^(debian|ubuntu)$ ]]; then
 		source_archive_url[cmake_ninja]="https://github.com/userdocs/qbt-cmake-ninja-crossbuilds/releases/latest/download/${os_id}-${os_version_codename}-cmake-$(dpkg --print-architecture).tar.xz"
 		source_archive_url[glibc]="https://ftpmirror.gnu.org/gnu/libc/${github_tag[glibc]}.tar.xz"
@@ -863,7 +862,7 @@ _set_module_urls() {
 	source_archive_url[icu]="https://github.com/unicode-org/icu/releases/download/${github_tag[icu]}/icu4c-${app_version[icu]/-/_}-src.tgz"
 	source_archive_url[double_conversion]="https://github.com/google/double-conversion/archive/refs/tags/${github_tag[double_conversion]}.tar.gz"
 	source_archive_url[openssl]="https://github.com/openssl/openssl/releases/download/${github_tag[openssl]}/${github_tag[openssl]}.tar.gz"
-	_boost_url # function to test and set the boost url and more
+	_boost_url # 用于测试和设置 boost url 等的函数
 	source_archive_url[libtorrent]="https://github.com/arvidn/libtorrent/releases/download/${github_tag[libtorrent]}/libtorrent-rasterbar-${github_tag[libtorrent]#v}.tar.gz"
 
 	read -ra qt_version_short_array <<< "${app_version[qtbase]//\./ }"
@@ -878,9 +877,9 @@ _set_module_urls() {
 	fi
 
 	source_archive_url[qbittorrent]="https://github.com/qbittorrent/qBittorrent/archive/refs/tags/${github_tag[qbittorrent]}.tar.gz"
-	##########################################################################################################################################################
-	# Configure the qbt_workflow_archive_url associative array for all the applications this script uses and we call them as ${qbt_workflow_archive_url[app_name]}
-	##########################################################################################################################################################
+
+	# 为该脚本使用的所有应用程序配置 qbt_workflow_archive_url 关联数组，我们将它们称为 ${qbt_workflow_archive_url[app_name]}
+
 	if [[ "${os_id}" =~ ^(debian|ubuntu)$ ]]; then
 		qbt_workflow_archive_url[cmake_ninja]="${source_archive_url[cmake_ninja]}"
 		qbt_workflow_archive_url[glibc]="https://github.com/userdocs/qbt-workflow-files/releases/latest/download/glibc.${github_tag[glibc]#glibc-}.tar.xz"
@@ -895,9 +894,9 @@ _set_module_urls() {
 	qbt_workflow_archive_url[qtbase]="https://github.com/userdocs/qbt-workflow-files/releases/latest/download/qt${qbt_qt_version:0:1}base.tar.xz"
 	qbt_workflow_archive_url[qttools]="https://github.com/userdocs/qbt-workflow-files/releases/latest/download/qt${qbt_qt_version:0:1}tools.tar.xz"
 	qbt_workflow_archive_url[qbittorrent]="https://github.com/userdocs/qbt-workflow-files/releases/latest/download/qbittorrent.tar.xz"
-	##########################################################################################################################################################
-	# Configure workflow override options
-	##########################################################################################################################################################
+
+	# 配置工作流覆盖选项
+
 	if [[ "${os_id}" =~ ^(debian|ubuntu)$ ]]; then
 		qbt_workflow_override[cmake_ninja]="no"
 		qbt_workflow_override[glibc]="no"
@@ -912,9 +911,9 @@ _set_module_urls() {
 	qbt_workflow_override[qtbase]="no"
 	qbt_workflow_override[qttools]="no"
 	qbt_workflow_override[qbittorrent]="no"
-	##########################################################################################################################################################
-	# Configure the default source type we use for the download function
-	##########################################################################################################################################################
+
+	# 配置我们用于下载功能的默认源类型
+
 	if [[ "${os_id}" =~ ^(debian|ubuntu)$ ]]; then
 		source_default[cmake_ninja]="file"
 		source_default[glibc]="file"
@@ -929,16 +928,15 @@ _set_module_urls() {
 	source_default[qtbase]="file"
 	source_default[qttools]="file"
 	source_default[qbittorrent]="file"
-	##########################################################################################################################################################
-	#
-	##########################################################################################################################################################
+
+
 	return
 }
-#######################################################################################################################################################
-# This function verifies the module names from the array qbt_modules in the default values function.
-#######################################################################################################################################################
+
+# 该函数验证默认值函数中数组 qbt_modules 中的模块名称。
+
 _installation_modules() {
-	# Delete modules - using the the delete array to unset them from the qbt_modules array
+	# 删除模块 - 使用删除数组从 qbt_modules 数组中取消设置它们
 	for target in "${delete[@]}"; do
 		for deactivated in "${!qbt_modules[@]}"; do
 			[[ "${qbt_modules[${deactivated}]}" == "${target}" ]] && unset 'qbt_modules[${deactivated}]'
@@ -946,7 +944,7 @@ _installation_modules() {
 	done
 	unset target deactivated
 
-	# For any modules params passed, test that they exist in the qbt_modules array or set qbt_modules_test to fail
+	# 对于传递的任何模块参数，测试它们是否存在于 qbt_modules 数组中或将 qbt_modules_test 设置为失败
 	for passed_params in "${@}"; do
 		if [[ ! "${qbt_modules[*]}" =~ (^|[^[:alpha:]])${passed_params}([^[:alpha:]]|$) ]]; then
 			qbt_modules_test="fail"
@@ -956,11 +954,11 @@ _installation_modules() {
 
 	if [[ "${qbt_modules_test}" != 'fail' && "${#}" -ne '0' ]]; then
 		if [[ "${1}" == "all" ]]; then
-			# If all is passed as a module and once the params check = pass has triggered this condition, remove to from the qbt_modules array to leave only the modules to be activated
+			# 如果所有内容都作为模块传递，并且一旦 params check = pass 触发了此条件，请从 qbt_modules 数组中删除 ，以仅保留要激活的模块
 			unset 'qbt_modules[0]'
-			# Rebuild the qbt_modules array so it is indexed starting from 0 after we have modified and removed items from it previously.
+			# 重建 qbt_modules 数组，以便在我们之前修改并删除其中的项目后，它的索引从 0 开始。
 			qbt_modules=("${qbt_modules[@]}")
-		else # Only activate the module passed as a param and leave the rest defaulted to skip
+		else # 仅激活作为参数传递的模块，其余部分默认跳过
 			unset 'qbt_modules[0]'
 			read -ra qbt_modules_skipped <<< "${qbt_modules[@]}"
 			declare -gA skip_modules
@@ -978,12 +976,12 @@ _installation_modules() {
 		done
 		unset modules_skip
 
-		# Create the directories we need.
+		# 创建需要的目录。
 		mkdir -p "${qbt_install_dir}/logs"
 		mkdir -p "${PKG_CONFIG_PATH}"
 		mkdir -p "${qbt_install_dir}/completed"
 
-		# Set some python variables we need.
+		# 设置一些我们需要的Python变量。
 		python_major="$(python"${qbt_python_version}" -c "import sys; print(sys.version_info[0])")"
 		python_minor="$(python"${qbt_python_version}" -c "import sys; print(sys.version_info[1])")"
 
@@ -998,15 +996,15 @@ _installation_modules() {
 		printf '\n%b\n' " ${unicode_yellow_circle}${text_bold} 脚本帮助${color_end}：${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_blue_light}-h${color_end}"
 	fi
 }
-#######################################################################################################################################################
-# This function will test to see if a Jamfile patch file exists via the variable patches_github_url for the tag used.
-#######################################################################################################################################################
+
+# 此函数将通过所使用标签的变量 patch_github_url 测试 Jamfile 补丁文件是否存在。
+
 _apply_patches() {
 	[[ -n "${1}" ]] && app_name="${1}"
-	# Start to define the default master branch we will use by transforming the app_version[libtorrent] variable to underscores. The result is dynamic and can be: RC_1_0, RC_1_1, RC_1_2, RC_2_0 and so on.
+	# 通过将 app_version[libtorrent] 变量转换为下划线，开始定义我们将使用的默认主分支。结果是动态的，可以是：RC_1_0、RC_1_1、RC_1_2、RC_2_0 等。
 	default_jamfile="${app_version[libtorrent]//./\_}"
 
-	# Remove everything after second underscore. Occasionally the tag will be short, like v2.0 so we need to make sure not remove the underscore if there is only one present.
+	# 删除第二个下划线之后的所有内容。有时标签会很短，例如 v2.0，因此我们需要确保在只有一个下划线的情况下不要删除下划线。
 	if [[ $(grep -o '_' <<< "${default_jamfile}" | wc -l) -le 1 ]]; then
 		default_jamfile="RC_${default_jamfile}"
 	elif [[ $(grep -o '_' <<< "${default_jamfile}" | wc -l) -ge 2 ]]; then
@@ -1030,7 +1028,7 @@ _apply_patches() {
 
 		# local
 		patch_file="${patch_dir}/patch"
-		patch_url_file="${patch_dir}/url" # A file with a url to raw patch info
+		patch_url_file="${patch_dir}/url" # 包含原始补丁信息 url 的文件
 		# remote
 		patch_file_remote="https://raw.githubusercontent.com/${qbt_patches_url}/master/patches/${app_name}/${app_version[${app_name}]}"
 
@@ -1039,11 +1037,11 @@ _apply_patches() {
 			patch_jamfile_url="https://raw.githubusercontent.com/${qbt_patches_url}/master/patches/${app_name}/${app_version[${app_name}]}/Jamfile"
 		fi
 
-		# Order of patch file preference
-		# 1. Local patch file - A custom patch file in the module version folder matching the build configuration
-		# 2. Local url file - A custom url to a raw patch file in the module version folder matching the build configuration
-		# 3. Remote patch file using the patch_file_remote/patch - A custom url to a raw patch file
-		# 4. Remote url file using patch_file_remote/url - A url to a raw patch file in the patch repo
+		# 补丁文件优先顺序
+		# 1. 本地补丁文件 - 模块版本文件夹中与构建配置匹配的自定义补丁文件
+		# 2. 本地 url 文件 - 与构建配置匹配的模块版本文件夹中原始补丁文件的自定义 url
+		# 3. 使用 patch_file_remote/patch 的远程补丁文件 - 原始补丁文件的自定义 url
+		# 4. 使用 patch_file_remote/url 的远程 url 文件 - 补丁存储库中原始补丁文件的 url
 
 		[[ "${source_default[${app_name}]}" == "folder" && ! -d "${qbt_cache_dir}/${app_name}" ]] && printf '\n' # cosmetics
 
@@ -1054,11 +1052,11 @@ _apply_patches() {
 			fi
 		}
 
-		if [[ -f "${patch_file}" ]]; then # If the patch file exists in the module version folder matching the build configuration then use this.
+		if [[ -f "${patch_file}" ]]; then # 如果补丁文件存在于与构建配置匹配的模块版本文件夹中，则使用它。
 			printf '%b\n\n' " ${unicode_green_circle} 从 ${color_red_light}本地:patch${color_end} 打补丁 - ${color_magenta_light}${app_name}${color_end} ${color_yellow_light}${app_version[${app_name}]}${color_end} - ${color_cyan_light}${patch_file}${color_end}"
-		elif [[ -f "${patch_url_file}" ]]; then # If a remote URL file exists in the module version folder matching the build configuration then use this to create the patch file for the next check
+		elif [[ -f "${patch_url_file}" ]]; then # 如果模块版本文件夹中存在与构建配置匹配的远程 URL 文件，则使用它来创建用于下一次检查的补丁文件
 			_patch_url
-		else # Else check that if there is a remotely host patch file available in the patch repo
+		else # 否则检查补丁存储库中是否有可用的远程主机补丁文件
 			if _curl --create-dirs "${patch_file_remote}/patch" -o "${patch_file}"; then
 				printf '%b\n\n' " ${unicode_green_circle} ${color_red}从远程打补丁${color_end} - ${color_magenta_light}${app_name}${color_end} ${color_yellow_light}${app_version[${app_name}]}${color_end} - ${color_yellow_light}${patch_file_remote}/patch${color_end}"
 			elif _curl --create-dirs "${patch_file_remote}/url" -o "${patch_url_file}"; then
@@ -1066,7 +1064,7 @@ _apply_patches() {
 			fi
 		fi
 
-		# Libtorrent specific stuff
+		# Libtorrent 特定内容
 		if [[ "${app_name}" == "libtorrent" ]]; then
 			if [[ "${qbt_libtorrent_master_jamfile}" == "yes" ]]; then
 				_curl --create-dirs "https://raw.githubusercontent.com/arvidn/libtorrent/${default_jamfile}/Jamfile" -o "${qbt_dl_folder_path}/${patch_jamfile##*/}"
@@ -1083,19 +1081,19 @@ _apply_patches() {
 			fi
 		fi
 
-		# Patch files
+		# 补丁文件
 		[[ -f "${patch_file}" ]] && patch -p1 < "${patch_file}"
 
-		# Copy modified files from source directory
+		# 从源目录复制修改后的文件
 		if [[ -d "${patch_dir}/source" && "$(ls -A "${patch_dir}/source")" ]]; then
 			printf '%b\n\n' " ${unicode_red_circle} ${color_yellow_light}从补丁源目录复制文件${color_end}"
 			cp -vrf "${patch_dir}/source/". "${qbt_dl_folder_path}/"
 		fi
 	fi
 }
-#######################################################################################################################################################
-# A unified download function to handle the processing of various options and directions the script can take.
-#######################################################################################################################################################
+
+# 统一的下载功能，用于处理脚本可以采取的各种选项和方向。
+
 _download() {
 	_pushd "${qbt_install_dir}"
 
@@ -1123,9 +1121,9 @@ _download() {
 
 	return 0
 }
-#######################################################################################################################################################
+
 #
-#######################################################################################################################################################
+
 _cache_dirs() {
 	# 如果路径不是以 / 开头，则通过在前面添加 qbt_working_dir 路径使其成为完整路径
 	if [[ ! "${qbt_cache_dir}" =~ ^/ ]]; then
@@ -1144,9 +1142,9 @@ _cache_dirs() {
 
 	return
 }
-#######################################################################################################################################################
+
 # 此功能用于根据标签下载 git 版本。
-#######################################################################################################################################################
+
 _download_folder() {
 	# 设置此项以避免克隆某些模块时出现警告
 	_git_git config --global advice.detachedHead false
@@ -1207,9 +1205,9 @@ _download_folder() {
 
 	return
 }
-#######################################################################################################################################################
+
 # 该函数用于下载源代码档案
-#######################################################################################################################################################
+
 _download_file() {
 	if [[ -f "${qbt_dl_file_path}" && "${qbt_workflow_artifacts}" == "no" ]]; then
 		# 这会检查存档是否损坏或为空，检查顶级文件夹，如果没有结果则退出，即存档为空 - 这样我们就可以进行 rm 和空替换
@@ -1259,9 +1257,9 @@ _download_file() {
 	unset additional_cmds
 	return
 }
-#######################################################################################################################################################
+
 # 静态库链接修复：检查 $lib_dir 中库的 *.so 和 *.a 版本，并将 *.so 链接更改为指向静态库，例如libdl.a
-#######################################################################################################################################################
+
 _fix_static_links() {
 	log_name="${app_name}"
 	mapfile -t library_list < <(find "${lib_dir}" -maxdepth 1 -exec bash -c 'basename "$0" ".${0##*.}"' {} \; | sort | uniq -d)
@@ -1287,9 +1285,9 @@ _fix_multiarch_static_links() {
 		return
 	fi
 }
-#######################################################################################################################################################
+
 # 此功能用于删除我们不再需要的文件和文件夹
-#######################################################################################################################################################
+
 _delete_function() {
 	[[ "${app_name}" != "cmake_ninja" ]] && printf '\n'
 	if [[ "${qbt_skip_delete}" != "yes" ]]; then
@@ -1301,9 +1299,9 @@ _delete_function() {
 		printf '%b\n' " ${unicode_yellow_circle}${color_red_light} 跳过 ${app_name} 删除${color_end}"
 	fi
 }
-#######################################################################################################################################################
+
 # 安装cmake
-#######################################################################################################################################################
+
 _cmake() {
 	if [[ "${qbt_build_tool}" == 'cmake' ]]; then
 		printf '\n%b\n' " ${unicode_blue_light_circle} ${color_blue_light}检查是否需要安装cmake和ninja${color_end}"
@@ -1333,9 +1331,9 @@ _cmake() {
 	fi
 	_pushd "${qbt_working_dir}"
 }
-#######################################################################################################################################################
+
 # 该函数处理脚本的多架构动态。
-#######################################################################################################################################################
+
 _multi_arch() {
 	if [[ "${multi_arch_options[${qbt_cross_name:-default}]}" == "${qbt_cross_name}" ]]; then
 		if [[ "${os_id}" =~ ^(alpine|debian|ubuntu)$ ]]; then
@@ -1654,9 +1652,9 @@ _multi_arch() {
 		return
 	fi
 }
-#######################################################################################################################################################
+
 # Github Actions 发布信息
-#######################################################################################################################################################
+
 _release_info() {
 	_error_tag
 
@@ -1752,13 +1750,12 @@ _release_info() {
 		>
 		> Binary builds are stripped - See https://userdocs.github.io/qbittorrent-nox-static/#/debugging
 	RELEASE_INFO
-	ls -Ah --full-time --group-directories-first "${release_info_dir}"
 
 	return
 }
-#######################################################################################################################################################
-# This is first help section that for triggers that do not require any processing and only provide a static result whe using help
-#######################################################################################################################################################
+
+# 这是第一个帮助部分，适用于不需要任何处理且仅在使用帮助时提供静态结果的触发器
+
 while (("${#}")); do
 	case ${1} in
 		-b | --build-directory)
@@ -1850,38 +1847,38 @@ while (("${#}")); do
 			qbt_workflow_files="yes"
 			shift
 			;;
-		--) # end argument parsing
+		--) # 结束参数解析
 			shift
 			break
 			;;
-		*) # preserve positional arguments
+		*) # 保留位置参数
 			params1+=("${1}")
 			shift
 			;;
 	esac
 done
-# Set positional arguments in their proper place.
+# 将位置参数设置在适当的位置。
 set -- "${params1[@]}"
-#######################################################################################################################################################
-# Functions part 1: Use some of our functions
-#######################################################################################################################################################
+
+# 函数第 1 部分：使用我们的一些函数
+
 _set_default_values "${@}" # see functions
 _check_dependencies        # see functions
 _test_url
 _set_build_directory    # see functions
 _set_module_urls "${@}" # see functions
 _script_version         # see functions
-#######################################################################################################################################################
-# Environment variables - settings positional parameters of flags
-#######################################################################################################################################################
+
+# 环境变量-设置flags的位置参数
+
 [[ -n "${qbt_patches_url}" ]] && set -- -pr "${qbt_patches_url}" "${@}"
 [[ -n "${qbt_boost_tag}" ]] && set -- -bt "${qbt_boost_tag}" "${@}"
 [[ -n "${qbt_libtorrent_tag}" ]] && set -- -lt "${qbt_libtorrent_tag}" "${@}"
 [[ -n "${qbt_qt_tag}" ]] && set -- -qtt "${qbt_qt_tag}" "${@}"
 [[ -n "${qbt_qbittorrent_tag}" ]] && set -- -qt "${qbt_qbittorrent_tag}" "${@}"
-#######################################################################################################################################################
+
 # 此部分控制我们可以传递给脚本以修改某些变量和行为的标志。
-#######################################################################################################################################################
+
 while (("${#}")); do
 	case "${1}" in
 		-bs-p | --boot-strap-patches)
@@ -2360,24 +2357,24 @@ while (("${#}")); do
 	esac
 done
 set -- "${params2[@]}" # 将位置参数设置在适当的位置。
-#######################################################################################################################################################
-# Functions part 2: Use some of our functions
-#######################################################################################################################################################
+
+# 函数第 2 部分：使用我们的一些函数
+
 [[ "${1}" == "install" ]] && _install_qbittorrent "${@}" # 查看函数
-#######################################################################################################################################################
+
 # 如果我们发现任何 github 标签验证失败或者 url 无效，我们现在就来看看
-#######################################################################################################################################################
+
 _error_tag
-#######################################################################################################################################################
+
 # 函数第 3 部分：任何要求上述 while 循环选项中的参数已移动的函数都必须位于此行之后
-#######################################################################################################################################################
+
 _set_cxx_standard
 _set_build_cons
 _debug "${@}"                # 需要从选项块 2 转移参数
 _installation_modules "${@}" # 需要从选项块 2 转移参数
-#######################################################################################################################################################
+
 # 如果任何模块未通过 qbt_modules_test，则立即退出。
-#######################################################################################################################################################
+
 if [[ "${qbt_modules_test}" == 'fail' || "${#}" -eq '0' ]]; then
 	printf '\n%b\n' " ${text_blink}${unicode_red_circle}${color_end}${text_bold} 不支持一个或多个提供的模块${color_end}"
 	printf '\n%b\n' " ${unicode_yellow_circle}${text_bold} 下面是编译的模块列表${color_end}"
@@ -2385,12 +2382,12 @@ if [[ "${qbt_modules_test}" == 'fail' || "${#}" -eq '0' ]]; then
 	_print_env
 	exit
 fi
-#######################################################################################################################################################
-# Functions part 4:
-#######################################################################################################################################################
+
+# 函数第 4 部分：
+
 _cmake
 _multi_arch
-#######################################################################################################################################################
+
 # shellcheck disable=SC2317
 _glibc_bootstrap() {
 	sub_dir="/BUILD"
@@ -2404,12 +2401,12 @@ _glibc() {
 
 	unset sub_dir
 }
-#######################################################################################################################################################
+
 # shellcheck disable=SC2317
 _zlib() {
 	if [[ "${qbt_build_tool}" == "cmake" ]]; then
 		mkdir -p "${qbt_install_dir}/graphs/${app_name}/${app_version["${app_name}"]}"
-		# force set some ARCH when using zlib-ng, cmake and musl-cross since it does not detect the arch correctly on Alpine.
+		# 使用 zlib-ng、cmake 和 musl-cross 时强制设置一些 ARCH，因为它在 Alpine 上无法正确检测到 arch。
 		[[ "${qbt_cross_target}" =~ ^(alpine)$ ]] && printf '%b\n' "\narchfound ${qbt_zlib_arch:-$(apk --print-arch)}" >> "${qbt_dl_folder_path}/cmake/detect-arch.c"
 		cmake -Wno-dev -Wno-deprecated --graphviz="${qbt_install_dir}/graphs/${app_name}/${app_version["${app_name}"]}/dep-graph.dot" -G Ninja -B build \
 			-D CMAKE_VERBOSE_MAKEFILE="${qbt_cmake_debug}" \
@@ -2423,7 +2420,7 @@ _zlib() {
 		cmake --install build |& _tee -a "${qbt_install_dir}/logs/${app_name}.log"
 		dot -Tpng -o "${qbt_install_dir}/completed/${app_name}-graph.png" "${qbt_install_dir}/graphs/${app_name}/${app_version["${app_name}"]}/dep-graph.dot"
 	else
-		# force set some ARCH when using zlib-ng, configure and musl-cross since it does not detect the arch correctly on Alpine.
+		# 使用 zlib-ng、configure 和 musl-cross 时强制设置一些 ARCH，因为它在 Alpine 上无法正确检测到 arch。
 		[[ "${qbt_cross_target}" =~ ^(alpine)$ ]] && sed "s|  CFLAGS=\"-O2 \${CFLAGS}\"|  ARCH=${qbt_zlib_arch:-$(apk --print-arch)}\n  CFLAGS=\"-O2 \${CFLAGS}\"|g" -i "${qbt_dl_folder_path}/configure"
 		./configure --prefix="${qbt_install_dir}" --static --zlib-compat |& _tee "${qbt_install_dir}/logs/${app_name}.log"
 		make -j"$(nproc)" CXXFLAGS="${CXXFLAGS}" CPPFLAGS="${CPPFLAGS}" LDFLAGS="${LDFLAGS}" |& _tee -a "${qbt_install_dir}/logs/${app_name}.log"
@@ -2431,7 +2428,7 @@ _zlib() {
 		make install |& _tee -a "${qbt_install_dir}/logs/${app_name}.log"
 	fi
 }
-#######################################################################################################################################################
+
 # shellcheck disable=SC2317
 _iconv() {
 	if [[ -n "${qbt_cache_dir}" && -d "${qbt_cache_dir}/${app_name}" ]]; then
@@ -2443,7 +2440,7 @@ _iconv() {
 	make -j"$(nproc)" |& _tee -a "${qbt_install_dir}/logs/${app_name}.log"
 	make install |& _tee -a "${qbt_install_dir}/logs/${app_name}.log"
 }
-#######################################################################################################################################################
+
 # shellcheck disable=SC2317
 _icu_bootstrap() {
 	if [[ -n "${qbt_cache_dir}" && -d "${qbt_cache_dir}/${app_name}" && "${qbt_workflow_files}" == "no" ]]; then
@@ -2452,7 +2449,7 @@ _icu_bootstrap() {
 		sub_dir="/source"
 	fi
 }
-#######################################################################################################################################################
+
 # shellcheck disable=SC2317
 _icu() {
 	if [[ "${multi_arch_options[${qbt_cross_name:-default}]}" == "${qbt_cross_name}" ]]; then
@@ -2470,7 +2467,7 @@ _icu() {
 
 	unset sub_dir
 }
-#######################################################################################################################################################
+
 # shellcheck disable=SC2317
 _openssl() {
 	"${multi_openssl[@]}" --prefix="${qbt_install_dir}" --libdir="${lib_dir##*/}" --openssldir="/etc/ssl" threads no-shared no-dso no-comp CXXFLAGS="${CXXFLAGS}" CPPFLAGS="${CPPFLAGS}" LDFLAGS="${LDFLAGS}" |& _tee "${qbt_install_dir}/logs/${app_name}.log"
@@ -2478,15 +2475,15 @@ _openssl() {
 	_post_command build
 	make install_sw |& _tee -a "${qbt_install_dir}/logs/${app_name}.log"
 }
-#######################################################################################################################################################
+
 # shellcheck disable=SC2317
 _boost_bootstrap() {
-	# If using source files and jfrog fails, default to git, if we are not using workflows sources.
+	# 如果使用源文件和 jfrog 失败，如果我们不使用工作流程源，则默认为 git。
 	if [[ "${boost_url_status}" =~ (403|404) && "${qbt_workflow_files}" == "no" && "${qbt_workflow_artifacts}" == "no" ]]; then
 		source_default["${app_name}"]="folder"
 	fi
 }
-#######################################################################################################################################################
+
 # shellcheck disable=SC2317
 _boost() {
 	if [[ "${source_default["${app_name}"]}" == "file" ]]; then
@@ -2505,7 +2502,7 @@ _boost() {
 		"${qbt_install_dir}/boost/b2" headers |& _tee "${qbt_install_dir}/logs/${app_name}.log"
 	fi
 }
-#######################################################################################################################################################
+
 # shellcheck disable=SC2317
 _libtorrent() {
 	export BOOST_ROOT="${qbt_install_dir}/boost"
@@ -2531,7 +2528,7 @@ _libtorrent() {
 		dot -Tpng -o "${qbt_install_dir}/completed/${app_name}-graph.png" "${qbt_install_dir}/graphs/${app_name}/${app_version["${app_name}"]}/dep-graph.dot"
 	else
 		[[ ${qbt_cross_name} =~ ^(armhf|armv7)$ ]] && arm_libatomic="-l:libatomic.a"
-		# Check the actual version of the cloned libtorrent instead of using the tag so that we can determine RC_1_1, RC_1_2 or RC_2_0 when a custom pr branch was used. This will always give an accurate result.
+		# 检查克隆的 libtorrent 的实际版本而不是使用标签，以便我们在使用自定义 pr 分支时可以确定 RC_1_1、RC_1_2 或 RC_2_0。这总是会给出准确的结果。
 		libtorrent_version_hpp="$(sed -rn 's|(.*)LIBTORRENT_VERSION "(.*)"|\2|p' include/libtorrent/version.hpp)"
 		if [[ "${libtorrent_version_hpp}" =~ ^1\.1\. ]]; then
 			libtorrent_library_filename="libtorrent.a"
@@ -2567,7 +2564,7 @@ _libtorrent() {
 		LIBTORRENT_PKG_CONFIG
 	fi
 }
-#######################################################################################################################################################
+
 # shellcheck disable=SC2317
 _double_conversion() {
 	if [[ "${qbt_build_tool}" == 'cmake' && "${qbt_qt_version}" =~ ^6 ]]; then
@@ -2586,7 +2583,7 @@ _double_conversion() {
 		dot -Tpng -o "${qbt_install_dir}/completed/${app_name}-graph.png" "${qbt_install_dir}/graphs/${app_name}/${app_version["${app_name}"]}/dep-graph.dot"
 	fi
 }
-#######################################################################################################################################################
+
 # shellcheck disable=SC2317
 _qtbase() {
 
@@ -2654,9 +2651,9 @@ _qtbase() {
 		else
 			icu=("-no-icu" "-iconv" "QMAKE_CXXFLAGS=-w -fpermissive")
 		fi
-		# Fix 5.15.4 to build on gcc 11
+		# 修复 5.15.4 以在 gcc 11 上构建
 		sed '/^#  include <utility>/a #  include <limits>' -i "src/corelib/global/qglobal.h"
-		# Don't strip by default by disabling these options. We will set it as off by default and use it with a switch
+		# 通过禁用这些选项，默认情况下不会剥离。我们将其默认设置为关闭并使用开关
 		printf '%b\n' "CONFIG                 += ${qbt_strip_qmake}" >> "mkspecs/common/linux.conf"
 		./configure "${multi_qtbase[@]}" -prefix "${qbt_install_dir}" "${icu[@]}" -opensource -confirm-license -release \
 			-openssl-linked -static -c++std "${qbt_cxx_standard}" -qt-pcre \
@@ -2672,7 +2669,7 @@ _qtbase() {
 		exit 1
 	fi
 }
-#######################################################################################################################################################
+
 # shellcheck disable=SC2317
 _qttools() {
 	if [[ "${qbt_build_tool}" == 'cmake' && "${qbt_qt_version}" =~ ^6 ]]; then
@@ -2703,7 +2700,7 @@ _qttools() {
 		exit 1
 	fi
 }
-#######################################################################################################################################################
+
 # shellcheck disable=SC2317
 _qbittorrent() {
 	[[ "${os_id}" =~ ^(alpine)$ ]] && stacktrace="OFF"
@@ -2744,36 +2741,36 @@ _qbittorrent() {
 
 	[[ -f "${qbt_install_dir}/bin/qbittorrent-nox" ]] && cp -vf "${qbt_install_dir}/bin/qbittorrent-nox" "${qbt_install_dir}/completed/qbittorrent-nox"
 }
-#######################################################################################################################################################
+
 # 模块安装程序循环。这将循环激活的模块并通过其相应的功能安装它们
-#######################################################################################################################################################
+
 for app_name in "${qbt_modules[@]}"; do
 	if [[ "${qbt_cache_dir_options}" != "bs" ]] && [[ ! -d "${qbt_install_dir}/boost" && "${app_name}" =~ (libtorrent|qbittorrent) ]]; then
 		printf '\n%b\n\n' " ${unicode_red_circle}${color_red_light} 警告${color_end} 该模块依赖于 boost 模块。将它们一起使用：${color_magenta_light}boost ${app_name}${color_end} "
 	else
 		if [[ "${skip_modules["${app_name}"]}" == "no" ]]; then
-			############################################################
+
 			skipped_false=$((skipped_false + 1))
-			############################################################
+
 			if command -v "_${app_name}_bootstrap" &> /dev/null; then
 				"_${app_name}_bootstrap"
 			fi
-			########################################################
+
 			if [[ "${app_name}" =~ (glibc|iconv|icu) ]]; then
 				_custom_flags_reset
 			else
 				_custom_flags_set
 			fi
-			############################################################
+
 			_download
-			############################################################
+
 			[[ "${qbt_cache_dir_options}" == "bs" && "${skipped_false}" -eq "${#qbt_modules[@]}" ]] && printf '\n'
 			[[ "${qbt_cache_dir_options}" == "bs" ]] && continue
-			############################################################
+
 			_apply_patches
-			############################################################
+
 			"_${app_name}"
-			############################################################
+
 			_fix_static_links
 			[[ "${app_name}" != "boost" ]] && _delete_function
 			[[ -f "${qbt_install_dir}/logs/${app_name}.log" ]] && cp -vf "${qbt_install_dir}/logs/${app_name}.log" "${release_info_dir}/"
@@ -2793,7 +2790,7 @@ for app_name in "${qbt_modules[@]}"; do
 	fi
 	_pushd "${qbt_working_dir}"
 done
-#######################################################################################################################################################
-# We are all done so now exit
-#######################################################################################################################################################
+
+# 都完成了，现在退出
+
 exit
