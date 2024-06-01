@@ -2741,7 +2741,7 @@ _qbittorrent() {
 		make install |& _tee -a "${qbt_install_dir}/logs/${app_name}.log"
 	fi
 
-	[[ -f "${qbt_install_dir}/bin/qbittorrent-nox" ]] && cp -vf "${qbt_install_dir}/bin/qbittorrent-nox" "${qbt_install_dir}/completed/${qbt_cross_name}-qt${qbt_qt_version}-${qBittorrent_version}-nox"
+	# [[ -f "${qbt_install_dir}/bin/qbittorrent-nox" ]] && cp -vf "${qbt_install_dir}/bin/qbittorrent-nox" "${qbt_install_dir}/completed/${qbt_cross_name}-qt${qbt_qt_version}-${qBittorrent_version}-nox"
 }
 #######################################################################################################################################################
 # 模块安装程序循环。这将循环激活的模块并通过其相应的功能安装它们
