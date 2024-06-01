@@ -145,13 +145,13 @@ jobs:
           fi
 
       - name: Docker - 发布信息 ${{ github.event.inputs.distinct_id }}
-        if: env.disable_qt5 != 'yes' # When qBittorrent v5 is released, remove this
+        if: env.disable_qt5 != 'yes' # 当qBittorrent v5发布时，删除这个
         run: |
           docker exec -w /root/${{ env.qbt_build_dir }}/release_info multiarch bash -c 'mv *.md *.json '/root/${{ env.qbt_build_dir }}/completed''
           docker exec -w /root/${{ env.qbt_build_dir }}/completed multiarch mv -f qbittorrent-nox ${{ matrix.qbt_cross_name }}-${{ matrix.qbt_qt_version_name }}qbittorrent-nox
 
       - name: 上传到 Artifacts ${{github.event.inputs.distinct_id}}
-        if: env.disable_qt5 != 'yes' && steps.compile.conclusion == 'success' && !cancelled()
+        if: env.disable_qt5 != 'yes' && !cancelled()
         uses: actions/upload-artifact@v4.3.1
         with:
           name: libtorrent-v${{matrix.qbt_libtorrent_version}}-${{matrix.qbt_cross_name}}-${{matrix.qbt_qt_version_name}}qBittorrent-nox
@@ -160,7 +160,7 @@ jobs:
             !${{env.qbt_build_dir}}/completed/*.png
 
       - name: graphs 上传到 Artifacts ${{github.event.inputs.distinct_id}}
-        if: matrix.qbt_build_tool == 'cmake' && env.disable_qt5 != 'yes' && steps.compile.conclusion == 'success' && !cancelled()
+        if: matrix.qbt_build_tool == 'cmake' && env.disable_qt5 != 'yes' && !cancelled()
         uses: actions/upload-artifact@v4.3.1
         with:
           name: "${{matrix.qbt_cross_name}}-libtorrent-v${{matrix.qbt_libtorrent_version}}-graphs"
