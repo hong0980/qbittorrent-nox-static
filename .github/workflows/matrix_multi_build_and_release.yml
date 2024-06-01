@@ -193,6 +193,11 @@ jobs:
       - name: Checkout ${{github.event.inputs.distinct_id}}
         uses: actions/checkout@v4.1.2
 
+      - name: Pandoc - Bootstrap
+        run: |
+          pandoc_git_tag="$(git ls-remote -q -t --refs https://github.com/jgm/pandoc.git | awk '/tags\/[0-9]/{sub("refs/tags/", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
+          curl -sLo- "https://github.com/jgm/pandoc/releases/latest/download/pandoc-${pandoc_git_tag}-linux-amd64.tar.gz" | tar xzf - --strip-components 2 -C "$(pwd)" --exclude="share"
+
       - name: Host - 下载 1.2 qbittorrent-nox ${{github.event.inputs.distinct_id}}
         uses: actions/download-artifact@v4.1.4
         with:
@@ -209,24 +214,21 @@ jobs:
 
       - name: Host - 合并发布信息 ${{github.event.inputs.distinct_id}}
         run: |
-          pandoc_git_tag="$(git ls-remote -q -t --refs https://github.com/jgm/pandoc.git | awk '/tags\/[0-9]/{sub("refs/tags/", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
-          curl -sLo- "https://github.com/jgm/pandoc/releases/latest/download/pandoc-${pandoc_git_tag}-linux-amd64.tar.gz" | tar xzf - --strip-components 2 -C "$(pwd)" --exclude="share"
-
-          if [[ ${{matrix.qbt_libtorrent_version}} == "1.2" ]]; then
+          if [[ ${{ matrix.qbt_libtorrent_version }} == "1.2" ]]; then
             for release in 1\.2/*-release.md; do
               [[ -f "${release}" ]] && release+=("${release}")
             done
             revision="$(jq -r .revision 1\.2/*-dependency-version.json | head -n1)"
           fi
 
-          if [[ ${{matrix.qbt_libtorrent_version}} == "2.0" ]]; then
+          if [[ ${{ matrix.qbt_libtorrent_version }} == "2.0" ]]; then
             for release in 2\.0/*-release.md; do
               [[ -f "${release}" ]] && release+=("${release}")
             done
             revision="$(jq -r .revision 2\.0/*-dependency-version.json | head -n1)"
           fi
 
-          readarray -t release_sorted < <(echo "${release[@]}" | sort)
+          readarray -t release_sorted < <(printf '%s\n' "${release[@]}" | sort)
 
           for dependency_version_files in 1\.2/*-dependency-version.json 2\.0/*-dependency-version.json; do
             if [[ -f "${dependency_version_files}" ]]; then
@@ -235,7 +237,7 @@ jobs:
             fi
           done
 
-          readarray -t dependency_version_sorted < <(echo "${dependency_version[@]}" | sort)
+          readarray -t dependency_version_sorted < <(printf '%s\n' "${dependency_version[@]}" | sort)
 
           paste -d '\n' "${release_sorted[@]}" | uniq | awk '!(NF && seen[$0]++) || /^>/' > "tmp-release.md"
           paste -d '\n' "${dependency_version_sorted[@]}" | uniq | awk '!(NF && seen[$0]++)' > "dependency-version.json"
@@ -243,21 +245,24 @@ jobs:
           sed -i "s|PLACEHOLDER|\"revision\": \"${revision}\"|" dependency-version.json
 
           ./pandoc --wrap=preserve -f gfm tmp-release.md -t gfm -o release.md
-          echo "release_tag=$(cat ${{matrix.qbt_libtorrent_version}}/tag.md)" >> $GITHUB_ENV
-          echo "release_title=$(cat ${{matrix.qbt_libtorrent_version}}/title.md)" >> $GITHUB_ENV
-          # ls -Ah --full-time --group-directories-first ${{matrix.qbt_libtorrent_version}}
 
-      - name: Host- 创建 标签 ${{github.event.inputs.distinct_id}}
+      - name: Host - Bootstrap release tag ${{ github.event.inputs.distinct_id }}
+        run: printf '%s\n' "release_tag=$(cat ${{ matrix.qbt_libtorrent_version }}/tag.md)" >> $GITHUB_ENV
+
+      - name: Host - Bootstrap release title ${{ github.event.inputs.distinct_id }}
+        run: printf '%s\n' "release_title=$(cat ${{ matrix.qbt_libtorrent_version }}/title.md)" >> $GITHUB_ENV
+
+      - name: Host- Create release - tag - assets ${{ github.event.inputs.distinct_id }}
         uses: ncipollo/release-action@v1.14.0
         with:
-          prerelease: "${{matrix.preview_release}}"
-          artifacts: "${{matrix.qbt_libtorrent_version}}/*-qbittorrent-nox,*dependency-version.json"
+          prerelease: "${{ matrix.preview_release }}"
+          artifacts: "${{ matrix.qbt_libtorrent_version }}/*-qbittorrent-nox,dependency-version.json"
           replacesArtifacts: true
-          tag: "${{env.release_tag}}"
-          name: "${{env.release_title}}"
+          tag: "${{ env.release_tag }}"
+          name: "${{ env.release_title }}"
           bodyFile: "release.md"
           allowUpdates: true
-          token: "${{github.TOKEN}}"
+          token: "${{ github.TOKEN }}"
 
   rerun-on-failure:
     if: failure() && inputs.skip_rerun == '0'
