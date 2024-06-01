@@ -70,9 +70,9 @@ jobs:
           echo 'APT::Get::Always-Include-Phased-Updates "false";' | sudo tee /etc/apt/apt.conf.d/99-phased-updates
           echo -e 'Package: *\nPin: release n=lunar\nPin-Priority: 50' | sudo tee /etc/apt/preferences
           echo 'deb http://archive.ubuntu.com/ubuntu/ lunar main universe restricted' | sudo tee /etc/apt/sources.list.d/lunar.list
-          sudo apt-get update
-          sudo apt-get -y upgrade
-          sudo apt install -t lunar libpipeline1 qemu-user-static binfmt-support
+          sudo apt-get -qq update
+          sudo apt-get -qq -y upgrade
+          sudo apt-get -qq install -t lunar libpipeline1 qemu-user-static binfmt-support
           echo "qbt_libtorrent_version=${{matrix.qbt_libtorrent_version}}" > env.custom
           echo "qbt_qt_version=${{matrix.qbt_qt_version}}" >> env.custom
           echo "qbt_build_tool=${{matrix.qbt_build_tool}}" >> env.custom
@@ -141,7 +141,7 @@ jobs:
             echo "disable_qt5=yes" >> $GITHUB_ENV
           fi
 
-      - name: Docker - Set release asset name ${{github.event.inputs.distinct_id}}
+      - name: Docker - 设置发布名称 ${{github.event.inputs.distinct_id}}
         if: env.disable_qt5 != 'yes' # 当qBittorrent v5发布时，删除这个
         run: |
           docker exec -w /root/${{env.qbt_build_dir}}/completed multiarch mv -f qbittorrent-nox ${{matrix.qbt_cross_name}}-${{matrix.qbt_qt_version_name}}qbittorrent-nox
@@ -152,8 +152,8 @@ jobs:
       #     docker exec -w /root multiarch apk add upx
       #     docker exec -w /root/${{env.qbt_build_dir}}/completed multiarch upx --brute --no-lzma ${{matrix.qbt_cross_name}}-${{matrix.qbt_qt_version_name}}qbittorrent-nox
 
-      - name: Host - Upload libtorrent-v${{matrix.qbt_libtorrent_version}}-qbittorrent-nox and release info artifact ${{github.event.inputs.distinct_id}}
-        if: env.disable_qt5 != 'yes' # When qBittorrent v5 is released, remove this
+      - name: Host - 上传 libtorrent-v${{matrix.qbt_libtorrent_version}}-qbittorrent-nox 并发布信息工件${{github.event.inputs.distinct_id}}
+        if: env.disable_qt5 != 'yes' # 当qBittorrent v5发布时，删除这个
         uses: actions/upload-artifact@v4.3.1
         with:
           name: libtorrent-v${{matrix.qbt_libtorrent_version}}-${{matrix.qbt_cross_name}}-${{matrix.qbt_qt_version_name}}qbittorrent-nox
@@ -162,7 +162,7 @@ jobs:
             !${{env.qbt_build_dir}}/completed/*.png
 
       - name: Host - Upload cmake graphs artifact ${{github.event.inputs.distinct_id}}
-        if: matrix.qbt_build_tool == 'cmake' && env.disable_qt5 != 'yes' # When qBittorrent v5 is released, remove this
+        if: matrix.qbt_build_tool == 'cmake' && env.disable_qt5 != 'yes' # 当qBittorrent v5发布时，删除这个
         uses: actions/upload-artifact@v4.3.1
         with:
           name: "${{matrix.qbt_cross_name}}-libtorrent-v${{matrix.qbt_libtorrent_version}}-graphs"
@@ -194,27 +194,25 @@ jobs:
       - name: Checkout ${{github.event.inputs.distinct_id}}
         uses: actions/checkout@v4.1.2
 
-      - name: Pandoc - Bootstrap
-        run: |
-          pandoc_git_tag="$(git ls-remote -q -t --refs https://github.com/jgm/pandoc.git | awk '/tags\/[0-9]/{sub("refs/tags/", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
-          curl -sLo- "https://github.com/jgm/pandoc/releases/latest/download/pandoc-${pandoc_git_tag}-linux-amd64.tar.gz" | tar xzf - --strip-components 2 -C "$(pwd)" --exclude="share"
-
-      - name: Host - Download 1.2 qbittorrent-nox artifacts ${{github.event.inputs.distinct_id}}
+      - name: Host - 下载 1.2 qbittorrent-nox ${{github.event.inputs.distinct_id}}
         uses: actions/download-artifact@v4.1.4
         with:
           path: "1.2"
           pattern: libtorrent-v1.2-*-qbittorrent-nox
           merge-multiple: true
 
-      - name: Host - Download 2.0 qbittorrent-nox artifacts ${{github.event.inputs.distinct_id}}
+      - name: Host - 下载 2.0 qbittorrent-nox ${{github.event.inputs.distinct_id}}
         uses: actions/download-artifact@v4.1.4
         with:
           path: "2.0"
           pattern: libtorrent-v2.0-*-qbittorrent-nox
           merge-multiple: true
 
-      - name: Host - merge release-info ${{github.event.inputs.distinct_id}}
+      - name: Host - 合并发布信息 ${{github.event.inputs.distinct_id}}
         run: |
+          pandoc_git_tag="$(git ls-remote -q -t --refs https://github.com/jgm/pandoc.git | awk '/tags\/[0-9]/{sub("refs/tags/", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
+          curl -sLo- "https://github.com/jgm/pandoc/releases/latest/download/pandoc-${pandoc_git_tag}-linux-amd64.tar.gz" | tar xzf - --strip-components 2 -C "$(pwd)" --exclude="share"
+
           if [[ ${{matrix.qbt_libtorrent_version}} == "1.2" ]]; then
             for release in 1\.2/*-release.md; do
               [[ -f "${release}" ]] && release+=("${release}")
@@ -248,9 +246,10 @@ jobs:
           ./pandoc --wrap=preserve -f gfm tmp-release.md -t gfm -o release.md
           echo "release_tag=$(cat ${{matrix.qbt_libtorrent_version}}/tag.md)" >> $GITHUB_ENV
           echo "release_title=$(cat ${{matrix.qbt_libtorrent_version}}/title.md)" >> $GITHUB_ENV
+          ls -Ah --full-time --group-directories-first ${{matrix.qbt_libtorrent_version}}
 
-      - name: Host- Create release - tag - assets ${{github.event.inputs.distinct_id}}
-        uses: ncipollo/release-action@v1
+      - name: Host- 创建 标签 ${{github.event.inputs.distinct_id}}
+        uses: ncipollo/release-action@v1.14.0
         with:
           prerelease: "${{matrix.preview_release}}"
           artifacts: "${{matrix.qbt_libtorrent_version}}/*-qbittorrent-nox,dependency-version.json"

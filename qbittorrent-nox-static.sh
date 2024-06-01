@@ -168,7 +168,7 @@ _set_default_values() {
 	qbt_optimise_strip="${qbt_optimise_strip:-yes}"
 
 	# Github 特定操作 - 构建修订 - 工作流程将动态设置此值，以便 URL 不会硬编码到单个存储库
-	qbt_revision_url="${qbt_revision_url:-hong0980/qbittorrent-nox-static}"
+	qbt_revision_url="${qbt_revision_url:-userdocs/qbittorrent-nox-static}"
 
 	# 提供一个路径来检查缓存的本地 git 存储库并使用它们。优先于工作流程文件。
 	qbt_cache_dir="${qbt_cache_dir%/}"
@@ -493,8 +493,8 @@ _qbittorrent_build_cons() {
 _set_build_cons() {
 	if [[ $(_qbittorrent_build_cons) == "yes" && "${qbt_qt_version}" == "5" ]]; then
 		printf '\n%b\n\n' " ${text_blink}${unicode_red_light_circle}${color_end} ${color_yellow}qBittorrent ${color_magenta}${github_tag[qbittorrent]}${color_yellow} 不支持 ${color_red}Qt5${color_yellow}。请使用 ${color_green}Qt6${color_yellow} 或 qBittorrent ${color_green}v4${color_yellow} 标签。${color_end}"
-		if [[ -d "${release_info_dir}" ]]; then touch "${release_info_dir}/disable-qt5"; fi # qbittorrent v5 transtion - workflow specific
-		exit                                                                                # non error exit to not upset github actions - just skip the step
+		if [[ -d "${release_info_dir}" ]]; then touch "${release_info_dir}/disable-qt5"; fi # qbittorrent v5 转换 - 特定于工作流程
+		exit                                                                                # 非错误退出不会扰乱 github 操作 - 只需跳过该步骤
 	fi
 }
 #######################################################################################################################################################
@@ -1752,6 +1752,7 @@ _release_info() {
 		>
 		> Binary builds are stripped - See https://userdocs.github.io/qbittorrent-nox-static/#/debugging
 	RELEASE_INFO
+	ls -Ah --full-time --group-directories-first "${release_info_dir}"
 
 	return
 }
@@ -2777,7 +2778,7 @@ for app_name in "${qbt_modules[@]}"; do
 			[[ "${app_name}" != "boost" ]] && _delete_function
 			[[ -f "${qbt_install_dir}/logs/${app_name}.log" ]] && cp -vf "${qbt_install_dir}/logs/${app_name}.log" "${release_info_dir}/"
 			# [[ "${app_name}" == "qbittorrent" ]] && \
-			# find "${release_info_dir}" -maxdepth 1 -type f -exec mv -v {} "${qbt_install_dir}/completed/" \;
+			# mv -v "${release_info_dir}/*.md *.json" "${qbt_build_dir}/completed/"
 		fi
 
 		if [[ "${#qbt_modules_skipped[@]}" -gt '0' ]]; then
