@@ -98,7 +98,6 @@ jobs:
       - name: Docker - 初始环境 ${{github.event.inputs.distinct_id}}
         run: |
           docker exec -w /root multiarch bash qbittorrent-nox-static.sh -bs-a
-          #if [[ -d patches ]]; then docker exec -w /root multiarch cp -vr patches/* /root/${{env.qbt_build_dir}}/patches; fi
           if [[ -f ${{env.qbt_build_dir}}/release_info/disable-qt5 ]]; then echo "disable_qt5=yes" >> $GITHUB_ENV fi
 
       - name: Docker - zlib-ng ${{github.event.inputs.distinct_id}}
