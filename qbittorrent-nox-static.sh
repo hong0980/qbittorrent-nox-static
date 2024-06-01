@@ -2111,13 +2111,13 @@ while (("${#}")); do
 			exit
 			;;
 		-h-b | --help-build-directory)
-		printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这里是针对此标志的帮助描述:${color_end}"
-		printf '\n%b\n' " 默认构建位置: ${color_cyan}${qbt_install_dir_short}${color_end}"
-		printf '\n%b\n' " ${color_blue_light}-b${color_end} 或 ${color_blue_light}--build-directory${color_end} 用于设置构建目录的位置。"
-		printf '\n%b\n' " ${color_yellow}路径是相对于脚本位置的。我建议您使用完整路径.${color_end}"
-		printf '\n%b\n' " ${text_dim}${unicode_blue_light_circle} 用法示例:${color_end} ${text_dim}${color_green}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${text_dim}${color_magenta_light}all${color_end} ${text_dim}- 将安装所有模块并将 libtorrent 构建到默认构建位置${color_end}"
-		printf '\n%b\n' " ${text_dim}${unicode_blue_light_circle} 用法示例:${color_end} ${text_dim}${color_green}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${text_dim}${color_magenta_light}module${color_end} ${text_dim}- 将安装单个模块到默认构建位置${color_end}"
-		printf '\n%b\n\n' " ${text_dim}${unicode_blue_light_circle} 用法示例:${color_end} ${text_dim}${color_green}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${text_dim}${color_magenta_light}module${color_end} ${color_blue_light}-b${color_end} ${text_dim}${color_cyan_light}\"\$HOME/build\"${color_end} ${text_dim}- 将指定自定义构建目录并将特定模块安装到该自定义位置${color_end}"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这里是针对此标志的帮助描述:${color_end}"
+			printf '\n%b\n' " 默认构建位置: ${color_cyan}${qbt_install_dir_short}${color_end}"
+			printf '\n%b\n' " ${color_blue_light}-b${color_end} 或 ${color_blue_light}--build-directory${color_end} 用于设置构建目录的位置。"
+			printf '\n%b\n' " ${color_yellow}路径是相对于脚本位置的。我建议您使用完整路径.${color_end}"
+			printf '\n%b\n' " ${text_dim}${unicode_blue_light_circle} 用法示例:${color_end} ${text_dim}${color_green}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${text_dim}${color_magenta_light}all${color_end} ${text_dim}- 将安装所有模块并将 libtorrent 构建到默认构建位置${color_end}"
+			printf '\n%b\n' " ${text_dim}${unicode_blue_light_circle} 用法示例:${color_end} ${text_dim}${color_green}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${text_dim}${color_magenta_light}module${color_end} ${text_dim}- 将安装单个模块到默认构建位置${color_end}"
+			printf '\n%b\n\n' " ${text_dim}${unicode_blue_light_circle} 用法示例:${color_end} ${text_dim}${color_green}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${text_dim}${color_magenta_light}module${color_end} ${color_blue_light}-b${color_end} ${text_dim}${color_cyan_light}\"\$HOME/build\"${color_end} ${text_dim}- 将指定自定义构建目录并将特定模块安装到该自定义位置${color_end}"
 			exit
 			;;
 		-h-bs-p | --help-boot-strap-patches)
@@ -2335,7 +2335,7 @@ while (("${#}")); do
 			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
 			printf '\n%b\n' " ${unicode_blue_light_circle} 这将打印出所有${color_yellow_light}_set_module_urls${color_end}数组的信息以供检查"
 			printf '\n%b\n\n' " ${unicode_blue_light_circle} 用法示例: ${color_blue_light}-sdu${color_end}"
-						exit
+			exit
 			;;
 		-h-wf | --help-workflow)
 			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
