@@ -1221,7 +1221,7 @@ _download_file() {
 	fi
 
 	if [[ "${qbt_cache_dir_options}" != "bs" && ! -f "${qbt_dl_file_path}" ]]; then
-		printf '\n%b\n\n' " ${unicode_blue_light_circle} 下载 ${color_magenta_light}${app_name}${color_end} 使用 ${color_yellow_light}${source_type}${color_end} - ${color_yellow_light}${qbt_dl_source_url}${color_end} 文件到 ${color_cyan_light}${qbt_dl_file_path}${color_end}"
+		printf '\n%b\n\n' " ${unicode_blue_light_circle} 下载 ${color_yellow_light}${source_type}${color_end} ${color_yellow_light}${qbt_dl_source_url}${color_end} - ${color_magenta_light}${app_name}${color_end} 文件到 ${color_cyan_light}${qbt_dl_file_path}${color_end}"
 	elif [[ -n "${qbt_cache_dir}" && "${qbt_cache_dir_options}" == "bs" && ! -f "${qbt_dl_file_path}" ]]; then
 		printf '\n%b\n' " ${unicode_blue_light_circle} 将 ${color_magenta_light}${app_name}${color_end} 的 ${color_yellow_light}${source_type}${color_end} 文件缓存到 ${color_cyan_light}${qbt_cache_dir}/${app_name}.tar.xz${color_end} - ${color_yellow_light}${qbt_dl_source_url}${color_end}"
 	elif [[ -n "${qbt_cache_dir}" && "${qbt_cache_dir_options}" == "bs" && -f "${qbt_dl_file_path}" ]]; then
@@ -1293,7 +1293,7 @@ _fix_multiarch_static_links() {
 _delete_function() {
 	[[ "${app_name}" != "cmake_ninja" ]] && printf '\n'
 	if [[ "${qbt_skip_delete}" != "yes" ]]; then
-		printf '%b\n' " ${unicode_green_circle}${color_red_light} 删除 ${app_name} 未缓存的安装文件和文件夹${color_end}"
+		printf '%b\n' " ${unicode_green_circle}${color_red_light} 删除 ${app_name} 缓存的安装文件和文件夹${color_end}"
 		[[ -f "${qbt_dl_file_path}" && "${qbt_workflow_artifacts}" == "no" ]] && rm -rf {"${qbt_install_dir:?}/$(tar tf "${qbt_dl_file_path}" | grep -Eom1 "(.*)[^/]")","${qbt_install_dir}/${app_name}.tar.xz"}
 		[[ -d "${qbt_dl_folder_path}" ]] && rm -rf "${qbt_install_dir}/${app_name:?}"
 		_pushd "${qbt_working_dir}"
@@ -2775,9 +2775,9 @@ for app_name in "${qbt_modules[@]}"; do
 			############################################################
 			_fix_static_links
 			[[ "${app_name}" != "boost" ]] && _delete_function
-			[[ -f "${qbt_install_dir}/logs/${app_name}.log" ]] && cp -f "${qbt_install_dir}/logs/${app_name}.log" "${release_info_dir}/"
-			[[ "${app_name}" == "qbittorrent" ]] && \
-			find "${release_info_dir}" -maxdepth 1 -type f -exec mv -v {} "${qbt_install_dir}/completed/" \;
+			[[ -f "${qbt_install_dir}/logs/${app_name}.log" ]] && cp -vf "${qbt_install_dir}/logs/${app_name}.log" "${release_info_dir}/"
+			# [[ "${app_name}" == "qbittorrent" ]] && \
+			# find "${release_info_dir}" -maxdepth 1 -type f -exec mv -v {} "${qbt_install_dir}/completed/" \;
 		fi
 
 		if [[ "${#qbt_modules_skipped[@]}" -gt '0' ]]; then

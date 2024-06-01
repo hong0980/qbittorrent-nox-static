@@ -144,13 +144,11 @@ jobs:
             printf '%s\n' "disable_qt5=yes" >> $GITHUB_ENV
           fi
 
-      - name: Docker - 设置发布名称 ${{ github.event.inputs.distinct_id }}
-        if: env.disable_qt5 != 'yes' # When qBittorrent v5 is released, remove this
-        run: docker exec -w /root/${{ env.qbt_build_dir }}/completed multiarch mv -f qbittorrent-nox ${{ matrix.qbt_cross_name }}-${{ matrix.qbt_qt_version_name }}qbittorrent-nox
-
       - name: Docker - 发布信息 ${{ github.event.inputs.distinct_id }}
         if: env.disable_qt5 != 'yes' # When qBittorrent v5 is released, remove this
-        run: docker exec -w /root/${{ env.qbt_build_dir }}/release_info multiarch bash -c 'mv *.md *.json '/root/${{ env.qbt_build_dir }}/completed''
+        run: |
+          docker exec -w /root/${{ env.qbt_build_dir }}/release_info multiarch bash -c 'mv *.md *.json '/root/${{ env.qbt_build_dir }}/completed''
+          docker exec -w /root/${{ env.qbt_build_dir }}/completed multiarch mv -f qbittorrent-nox ${{ matrix.qbt_cross_name }}-${{ matrix.qbt_qt_version_name }}qbittorrent-nox
 
       - name: 上传到 Artifacts ${{github.event.inputs.distinct_id}}
         if: env.disable_qt5 != 'yes' && steps.compile.conclusion == 'success' && !cancelled()
