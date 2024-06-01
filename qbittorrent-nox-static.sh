@@ -1101,7 +1101,7 @@ _download() {
 
 	[[ -n "${1}" ]] && app_name="${1}"
 
-	# The location we download source archives and folders to
+	# 下载源档案和文件夹的位置
 	qbt_dl_dir="${qbt_install_dir}"
 	qbt_dl_file_path="${qbt_dl_dir}/${app_name}.tar.xz"
 	qbt_dl_folder_path="${qbt_dl_dir}/${app_name}"
@@ -1127,7 +1127,7 @@ _download() {
 #
 #######################################################################################################################################################
 _cache_dirs() {
-	# If the path is not starting with / then make it a full path by prepending the qbt_working_dir path
+	# 如果路径不是以 / 开头，则通过在前面添加 qbt_working_dir 路径使其成为完整路径
 	if [[ ! "${qbt_cache_dir}" =~ ^/ ]]; then
 		qbt_cache_dir="${qbt_working_dir}/${qbt_cache_dir}"
 	fi
@@ -1145,7 +1145,7 @@ _cache_dirs() {
 	return
 }
 #######################################################################################################################################################
-# This function is for downloading git releases based on their tag.
+# 此功能用于根据标签下载 git 版本。
 #######################################################################################################################################################
 _download_folder() {
 	# 设置此项以避免克隆某些模块时出现警告
@@ -1312,7 +1312,7 @@ _cmake() {
 		if [[ "${os_id}" =~ ^(debian|ubuntu)$ ]]; then
 			if [[ "$(cmake --version 2> /dev/null | awk 'NR==1{print $3}')" != "${app_version[cmake_debian]}" ]]; then
 				_download cmake_ninja
-				_post_command "Debian cmake and ninja installation"
+				_post_command "Debian cmake 和 ninja 安装"
 
 				printf '\n%b\n' " ${unicode_yellow_circle} 使用 cmake: ${color_yellow_light}${app_version[cmake_debian]}"
 				printf '\n%b\n' " ${unicode_yellow_circle} 使用 ninja: ${color_yellow_light}${app_version[ninja_debian]}"
@@ -1810,7 +1810,7 @@ while (("${#}")); do
 				for arches in "${multi_arch_options[@]}"; do
 					printf '%b\n' " ${unicode_blue_light_circle} ${arches}${color_end}"
 				done
-				printf '\n%b\n\n' " ${unicode_green_circle} Example usage:${color_blue_light} -ma aarch64${color_end}"
+				printf '\n%b\n\n' " ${unicode_green_circle} 示例用法:${color_blue_light} -ma aarch64${color_end}"
 				exit 1
 			fi
 			;;
@@ -1968,7 +1968,7 @@ while (("${#}")); do
 
 				read -ra lt_version_short_array <<< "${app_version[libtorrent]//\./ }"
 				qbt_libtorrent_version="${lt_version_short_array[0]}.${lt_version_short_array[1]}"
-				[[ "${github_tag[libtorrent]}" =~ ^RC_ ]] && app_version[libtorrent]="RC_${app_version[libtorrent]//\./_}" # set back to RC_... so that release info has proper version context
+				[[ "${github_tag[libtorrent]}" =~ ^RC_ ]] && app_version[libtorrent]="RC_${app_version[libtorrent]//\./_}" # 设置回 RC_... 以便发布信息具有正确的版本上下文
 
 				_test_git_ouput "${github_tag[libtorrent]}" "libtorrent" "$2"
 				shift 2
@@ -2047,77 +2047,77 @@ while (("${#}")); do
 			fi
 			;;
 		-h | --help)
-			printf '\n%b\n\n' " ${text_bold}${text_underlined}Here are a list of available options${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-b${color_end}     ${text_dim}or${color_end} ${color_blue_light}--build-directory${color_end}       ${color_yellow}Help:${color_end} ${color_blue_light}-h-b${color_end}     ${text_dim}or${color_end} ${color_blue_light}--help-build-directory${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-bt${color_end}    ${text_dim}or${color_end} ${color_blue_light}--boost-version${color_end}         ${color_yellow}Help:${color_end} ${color_blue_light}-h-bt${color_end}    ${text_dim}or${color_end} ${color_blue_light}--help-boost-version${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-c${color_end}     ${text_dim}or${color_end} ${color_blue_light}--cmake${color_end}                 ${color_yellow}Help:${color_end} ${color_blue_light}-h-c${color_end}     ${text_dim}or${color_end} ${color_blue_light}--help-cmake${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-cd${color_end}    ${text_dim}or${color_end} ${color_blue_light}--cache-directory${color_end}       ${color_yellow}Help:${color_end} ${color_blue_light}-h-cd${color_end}    ${text_dim}or${color_end} ${color_blue_light}--help-cache-directory${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-d${color_end}     ${text_dim}or${color_end} ${color_blue_light}--debug${color_end}                 ${color_yellow}Help:${color_end} ${color_blue_light}-h-d${color_end}     ${text_dim}or${color_end} ${color_blue_light}--help-debug${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-bs-p${color_end}  ${text_dim}or${color_end} ${color_blue_light}--boot-strap-patches${color_end}    ${color_yellow}Help:${color_end} ${color_blue_light}-h-bs-p${color_end}  ${text_dim}or${color_end} ${color_blue_light}--help-boot-strap-patches${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-bs-c${color_end}  ${text_dim}or${color_end} ${color_blue_light}--boot-strap-cmake${color_end}      ${color_yellow}Help:${color_end} ${color_blue_light}-h-bs-c${color_end}  ${text_dim}or${color_end} ${color_blue_light}--help-boot-strap-cmake${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-bs-r${color_end}  ${text_dim}or${color_end} ${color_blue_light}--boot-strap-release${color_end}    ${color_yellow}Help:${color_end} ${color_blue_light}-h-bs-r${color_end}  ${text_dim}or${color_end} ${color_blue_light}--help-boot-strap-release${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-bs-ma${color_end} ${text_dim}or${color_end} ${color_blue_light}--boot-strap-multi-arch${color_end} ${color_yellow}Help:${color_end} ${color_blue_light}-h-bs-ma${color_end} ${text_dim}or${color_end} ${color_blue_light}--help-boot-strap-multi-arch${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-bs-a${color_end}  ${text_dim}or${color_end} ${color_blue_light}--boot-strap-all${color_end}        ${color_yellow}Help:${color_end} ${color_blue_light}-h-bs-a${color_end}  ${text_dim}or${color_end} ${color_blue_light}--help-boot-strap-all${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-i${color_end}     ${text_dim}or${color_end} ${color_blue_light}--icu${color_end}                   ${color_yellow}Help:${color_end} ${color_blue_light}-h-i${color_end}     ${text_dim}or${color_end} ${color_blue_light}--help-icu${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-lm${color_end}    ${text_dim}or${color_end} ${color_blue_light}--libtorrent-master${color_end}     ${color_yellow}Help:${color_end} ${color_blue_light}-h-lm${color_end}    ${text_dim}or${color_end} ${color_blue_light}--help-libtorrent-master${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-lt${color_end}    ${text_dim}or${color_end} ${color_blue_light}--libtorrent-tag${color_end}        ${color_yellow}Help:${color_end} ${color_blue_light}-h-lt${color_end}    ${text_dim}or${color_end} ${color_blue_light}--help-libtorrent-tag${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-m${color_end}     ${text_dim}or${color_end} ${color_blue_light}--master${color_end}                ${color_yellow}Help:${color_end} ${color_blue_light}-h-m${color_end}     ${text_dim}or${color_end} ${color_blue_light}--help-master${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-ma${color_end}    ${text_dim}or${color_end} ${color_blue_light}--multi-arch${color_end}            ${color_yellow}Help:${color_end} ${color_blue_light}-h-ma${color_end}    ${text_dim}or${color_end} ${color_blue_light}--help-multi-arch${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-n${color_end}     ${text_dim}or${color_end} ${color_blue_light}--no-delete${color_end}             ${color_yellow}Help:${color_end} ${color_blue_light}-h-n${color_end}     ${text_dim}or${color_end} ${color_blue_light}--help-no-delete${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-o${color_end}     ${text_dim}or${color_end} ${color_blue_light}--optimize${color_end}              ${color_yellow}Help:${color_end} ${color_blue_light}-h-o${color_end}     ${text_dim}or${color_end} ${color_blue_light}--help-optimize${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-p${color_end}     ${text_dim}or${color_end} ${color_blue_light}--proxy${color_end}                 ${color_yellow}Help:${color_end} ${color_blue_light}-h-p${color_end}     ${text_dim}or${color_end} ${color_blue_light}--help-proxy${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-pr${color_end}    ${text_dim}or${color_end} ${color_blue_light}--patch-repo${color_end}            ${color_yellow}Help:${color_end} ${color_blue_light}-h-pr${color_end}    ${text_dim}or${color_end} ${color_blue_light}--help-patch-repo${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-qm${color_end}    ${text_dim}or${color_end} ${color_blue_light}--qbittorrent-master${color_end}    ${color_yellow}Help:${color_end} ${color_blue_light}-h-qm${color_end}    ${text_dim}or${color_end} ${color_blue_light}--help-qbittorrent-master${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-qt${color_end}    ${text_dim}or${color_end} ${color_blue_light}--qbittorrent-tag${color_end}       ${color_yellow}Help:${color_end} ${color_blue_light}-h-qt${color_end}    ${text_dim}or${color_end} ${color_blue_light}--help-qbittorrent-tag${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-qtt${color_end}   ${text_dim}or${color_end} ${color_blue_light}--qt-tag${color_end}                ${color_yellow}Help:${color_end} ${color_blue_light}-h-qtt${color_end}   ${text_dim}or${color_end} ${color_blue_light}--help-qtt-tag${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-sdu${color_end}   ${text_dim}or${color_end} ${color_blue_light}--script-debug-urls${color_end}     ${color_yellow}Help:${color_end} ${color_blue_light}-h-sdu${color_end}   ${text_dim}or${color_end} ${color_blue_light}--help-script-debug-urls${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-si${color_end}    ${text_dim}or${color_end} ${color_blue_light}--static-ish${color_end}            ${color_yellow}Help:${color_end} ${color_blue_light}-h-s${color_end}     ${text_dim}or${color_end} ${color_blue_light}--help-strip${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-s${color_end}     ${text_dim}or${color_end} ${color_blue_light}--strip${color_end}                 ${color_yellow}Help:${color_end} ${color_blue_light}-h-s${color_end}     ${text_dim}or${color_end} ${color_blue_light}--help-strip${color_end}"
-			printf '%b\n' " ${color_green}Use:${color_end} ${color_blue_light}-wf${color_end}    ${text_dim}or${color_end} ${color_blue_light}--workflow${color_end}              ${color_yellow}Help:${color_end} ${color_blue_light}-h-wf${color_end}    ${text_dim}or${color_end} ${color_blue_light}--help-workflow${color_end}"
-			printf '\n%b\n' " ${text_bold}${text_underlined}Module specific help - flags are used with the modules listed here.${color_end}"
-			printf '\n%b\n' " ${color_green}Use:${color_end} ${color_magenta_light}all${color_end} ${text_dim}or${color_end} ${color_magenta_light}module-name${color_end}          ${color_green}Usage:${color_end} ${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_magenta_light}all${color_end} ${color_blue_light}-i${color_end}"
-			printf '\n%b\n' " ${text_dim}${color_magenta_light}all${color_end} ${text_dim}----------------${color_end} ${text_dim}${color_yellow_light}optional${color_end} ${text_dim}Recommended method to install all modules${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}install${color_end} ${text_dim}------------${color_end} ${text_dim}${color_yellow_light}optional${color_end} ${text_dim}Install the ${text_dim}${color_cyan_light}${qbt_install_dir_short}/completed/qbittorrent-nox${color_end} ${text_dim}binary${color_end}"
-			[[ "${os_id}" =~ ^(debian|ubuntu)$ ]] && printf '%b\n' " ${text_dim}${color_magenta_light}glibc${color_end} ${text_dim}--------------${color_end} ${text_dim}${color_red_light}required${color_end} ${text_dim}Build libc locally to statically link nss${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}zlib${color_end} ${text_dim}---------------${color_end} ${text_dim}${color_red_light}required${color_end} ${text_dim}Build zlib locally${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}iconv${color_end} ${text_dim}--------------${color_end} ${text_dim}${color_red_light}required${color_end} ${text_dim}Build iconv locally${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}icu${color_end} ${text_dim}----------------${color_end} ${text_dim}${color_yellow_light}optional${color_end} ${text_dim}Build ICU locally${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}openssl${color_end} ${text_dim}------------${color_end} ${text_dim}${color_red_light}required${color_end} ${text_dim}Build openssl locally${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}boost${color_end} ${text_dim}--------------${color_end} ${text_dim}${color_red_light}required${color_end} ${text_dim}Download, extract and build the boost library files${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}libtorrent${color_end} ${text_dim}---------${color_end} ${text_dim}${color_red_light}required${color_end} ${text_dim}Build libtorrent locally${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}double_conversion${color_end} ${text_dim}--${color_end} ${text_dim}${color_red_light}required${color_end} ${text_dim}A cmake + Qt6 build component on modern OS only.${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}qtbase${color_end} ${text_dim}-------------${color_end} ${text_dim}${color_red_light}required${color_end} ${text_dim}Build qtbase locally${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}qttools${color_end} ${text_dim}------------${color_end} ${text_dim}${color_red_light}required${color_end} ${text_dim}Build qttools locally${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}qbittorrent${color_end} ${text_dim}--------${color_end} ${text_dim}${color_red_light}required${color_end} ${text_dim}Build qbittorrent locally${color_end}"
-			printf '\n%b\n' " ${text_bold}${text_underlined}env help - supported exportable evironment variables${color_end}"
-			printf '\n%b\n' " ${text_dim}${color_magenta_light}export qbt_libtorrent_version=\"\"${color_end} ${text_dim}--------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}1.2 - 2.0${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_qt_version=\"\"${color_end} ${text_dim}----------------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}5 - 5.15 - 6 - 6.2 - 6.3 and so on${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_build_tool=\"\"${color_end} ${text_dim}----------------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}qmake - cmake${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_cross_name=\"\"${color_end} ${text_dim}----------------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}x86_64 - aarch64 - armv7 - armhf${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_patches_url=\"\"${color_end} ${text_dim}---------------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}userdocs/qbittorrent-nox-static.${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_libtorrent_tag=\"\"${color_end} ${text_dim}------------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}Takes a valid git tag or branch for libtorrent${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_qbittorrent_tag=\"\"${color_end} ${text_dim}-----------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}Takes a valid git tag or branch for qbittorrent${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_boost_tag=\"\"${color_end} ${text_dim}-----------------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}Takes a valid git tag or branch for boost${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_qt_tag=\"\"${color_end} ${text_dim}--------------------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}Takes a valid git tag or branch for Qt${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_workflow_files=\"\"${color_end} ${text_dim}------------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}yes no - use qbt-workflow-files for dependencies${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_workflow_artifacts=\"\"${color_end} ${text_dim}--------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}yes no - use qbt_workflow_artifacts for dependencies${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_cache_dir=\"\"${color_end} ${text_dim}-----------------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}path empty - provide a path to a cache directory${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_libtorrent_master_jamfile=\"\"${color_end} ${text_dim}-${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}yes no - use RC branch instead of release jamfile${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_optimise_strip=\"\"${color_end} ${text_dim}------------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}yes no - strip binaries - cannot be used with debug${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_build_debug=\"\"${color_end} ${text_dim}---------------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}yes no - debug build - cannot be used with strip${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_standard=\"\"${color_end} ${text_dim}------------------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}14 - 17 - 20 - 23 - c standard for gcc - for older build combos${color_end}"
-			printf '%b\n' " ${text_dim}${color_magenta_light}export qbt_static_ish=\"\"${color_end} ${text_dim}----------------${color_end} ${text_dim}${color_red_light}options${color_end} ${text_dim}yes no - libc linking - link dynamically to libc${color_end}"
+			printf '\n%b\n\n' " ${text_bold}${text_underlined}这里是可用选项列表${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-b${color_end}     ${text_dim}或${color_end} ${color_blue_light}--build-directory${color_end}       ${color_yellow}帮助:${color_end} ${color_blue_light}-h-b${color_end}     ${text_dim}或${color_end} ${color_blue_light}--help-build-directory${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-bt${color_end}    ${text_dim}或${color_end} ${color_blue_light}--boost-version${color_end}         ${color_yellow}帮助:${color_end} ${color_blue_light}-h-bt${color_end}    ${text_dim}或${color_end} ${color_blue_light}--help-boost-version${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-c${color_end}     ${text_dim}或${color_end} ${color_blue_light}--cmake${color_end}                 ${color_yellow}帮助:${color_end} ${color_blue_light}-h-c${color_end}     ${text_dim}或${color_end} ${color_blue_light}--help-cmake${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-cd${color_end}    ${text_dim}或${color_end} ${color_blue_light}--cache-directory${color_end}       ${color_yellow}帮助:${color_end} ${color_blue_light}-h-cd${color_end}    ${text_dim}或${color_end} ${color_blue_light}--help-cache-directory${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-d${color_end}     ${text_dim}或${color_end} ${color_blue_light}--debug${color_end}                 ${color_yellow}帮助:${color_end} ${color_blue_light}-h-d${color_end}     ${text_dim}或${color_end} ${color_blue_light}--help-debug${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-bs-p${color_end}  ${text_dim}或${color_end} ${color_blue_light}--boot-strap-patches${color_end}    ${color_yellow}帮助:${color_end} ${color_blue_light}-h-bs-p${color_end}  ${text_dim}或${color_end} ${color_blue_light}--help-boot-strap-patches${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-bs-c${color_end}  ${text_dim}或者${color_end} ${color_blue_light}--boot-strap-cmake${color_end}      ${color_yellow}帮助:${color_end} ${color_blue_light}-h-bs-c${color_end}  ${text_dim}或者${color_end} ${color_blue_light}--help-boot-strap-cmake${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-bs-r${color_end}  ${text_dim}或者${color_end} ${color_blue_light}--boot-strap-release${color_end}    ${color_yellow}帮助:${color_end} ${color_blue_light}-h-bs-r${color_end}  ${text_dim}或者${color_end} ${color_blue_light}--help-boot-strap-release${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-bs-ma${color_end} ${text_dim}或者${color_end} ${color_blue_light}--boot-strap-multi-arch${color_end} ${color_yellow}帮助:${color_end} ${color_blue_light}-h-bs-ma${color_end} ${text_dim}或者${color_end} ${color_blue_light}--help-boot-strap-multi-arch${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-bs-a${color_end}  ${text_dim}或者${color_end} ${color_blue_light}--boot-strap-all${color_end}        ${color_yellow}帮助:${color_end} ${color_blue_light}-h-bs-a${color_end}  ${text_dim}或者${color_end} ${color_blue_light}--help-boot-strap-all${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-i${color_end}     ${text_dim}或者${color_end} ${color_blue_light}--icu${color_end}                   ${color_yellow}帮助:${color_end} ${color_blue_light}-h-i${color_end}     ${text_dim}或者${color_end} ${color_blue_light}--help-icu${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-lm${color_end}    ${text_dim}或者${color_end} ${color_blue_light}--libtorrent-master${color_end}     ${color_yellow}帮助:${color_end} ${color_blue_light}-h-lm${color_end}    ${text_dim}或者${color_end} ${color_blue_light}--help-libtorrent-master${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-lt${color_end}    ${text_dim}或者${color_end} ${color_blue_light}--libtorrent-tag${color_end}        ${color_yellow}帮助:${color_end} ${color_blue_light}-h-lt${color_end}    ${text_dim}或者${color_end} ${color_blue_light}--help-libtorrent-tag${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-m${color_end}     ${text_dim}或者${color_end} ${color_blue_light}--master${color_end}                ${color_yellow}帮助:${color_end} ${color_blue_light}-h-m${color_end}     ${text_dim}或者${color_end} ${color_blue_light}--help-master${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-ma${color_end}    ${text_dim}或者${color_end} ${color_blue_light}--multi-arch${color_end}            ${color_yellow}帮助:${color_end} ${color_blue_light}-h-ma${color_end}    ${text_dim}或者${color_end} ${color_blue_light}--help-multi-arch${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-n${color_end}     ${text_dim}或者${color_end} ${color_blue_light}--no-delete${color_end}             ${color_yellow}帮助:${color_end} ${color_blue_light}-h-n${color_end}     ${text_dim}或者${color_end} ${color_blue_light}--help-no-delete${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-o${color_end}     ${text_dim}或者${color_end} ${color_blue_light}--optimize${color_end}              ${color_yellow}帮助:${color_end} ${color_blue_light}-h-o${color_end}     ${text_dim}或者${color_end} ${color_blue_light}--help-optimize${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-p${color_end}     ${text_dim}或者${color_end} ${color_blue_light}--proxy${color_end}                 ${color_yellow}帮助:${color_end} ${color_blue_light}-h-p${color_end}     ${text_dim}或者${color_end} ${color_blue_light}--help-proxy${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-pr${color_end}    ${text_dim}或者${color_end} ${color_blue_light}--patch-repo${color_end}            ${color_yellow}帮助:${color_end} ${color_blue_light}-h-pr${color_end}    ${text_dim}或者${color_end} ${color_blue_light}--help-patch-repo${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-qm${color_end}    ${text_dim}或者${color_end} ${color_blue_light}--qbittorrent-master${color_end}    ${color_yellow}帮助:${color_end} ${color_blue_light}-h-qm${color_end}    ${text_dim}或者${color_end} ${color_blue_light}--help-qbittorrent-master${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-qt${color_end}    ${text_dim}或者${color_end} ${color_blue_light}--qbittorrent-tag${color_end}       ${color_yellow}帮助:${color_end} ${color_blue_light}-h-qt${color_end}    ${text_dim}或者${color_end} ${color_blue_light}--help-qbittorrent-tag${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-qtt${color_end}   ${text_dim}或者${color_end} ${color_blue_light}--qt-tag${color_end}                ${color_yellow}帮助:${color_end} ${color_blue_light}-h-qtt${color_end}   ${text_dim}或者${color_end} ${color_blue_light}--help-qtt-tag${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-sdu${color_end}   ${text_dim}或者${color_end} ${color_blue_light}--script-debug-urls${color_end}     ${color_yellow}帮助:${color_end} ${color_blue_light}-h-sdu${color_end}   ${text_dim}或者${color_end} ${color_blue_light}--help-script-debug-urls${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-si${color_end}    ${text_dim}或者${color_end} ${color_blue_light}--static-ish${color_end}            ${color_yellow}帮助:${color_end} ${color_blue_light}-h-s${color_end}     ${text_dim}或者${color_end} ${color_blue_light}--help-strip${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-s${color_end}     ${text_dim}或者${color_end} ${color_blue_light}--strip${color_end}                 ${color_yellow}帮助:${color_end} ${color_blue_light}-h-s${color_end}     ${text_dim}或者${color_end} ${color_blue_light}--help-strip${color_end}"
+			printf '%b\n' " ${color_green}使用:${color_end} ${color_blue_light}-wf${color_end}    ${text_dim}或者${color_end} ${color_blue_light}--workflow${color_end}              ${color_yellow}帮助:${color_end} ${color_blue_light}-h-wf${color_end}    ${text_dim}或者${color_end} ${color_blue_light}--help-workflow${color_end}"
+			printf '\n%b\n' " ${text_bold}${text_underlined}模块特定帮助 - 标志与此处列出的模块一起使用.${color_end}"
+			printf '\n%b\n' " ${color_green}使用:${color_end} ${color_magenta_light}all${color_end} ${text_dim}或者${color_end} ${color_magenta_light}module-name${color_end}          ${color_green}用法:${color_end} ${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_magenta_light}all${color_end} ${color_blue_light}-i${color_end}"
+			printf '\n%b\n' " ${text_dim}${color_magenta_light}all${color_end} ${text_dim}----------------${color_end} ${text_dim}${color_yellow_light}可选${color_end} ${text_dim}推荐的安装所有模块的方法${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}install${color_end} ${text_dim}------------${color_end} ${text_dim}${color_yellow_light}可选${color_end} ${text_dim}安装 ${text_dim}${color_cyan_light}${qbt_install_dir_short}/completed/qbittorrent-nox${color_end} ${text_dim}二进制文件${color_end}"
+			[[ "${os_id}" =~ ^(debian|ubuntu)$ ]] && printf '%b\n' " ${text_dim}${color_magenta_light}glibc${color_end} ${text_dim}--------------${color_end} ${text_dim}${color_red_light}必需${color_end} ${text_dim}本地构建 libc 以静态链接 nss${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}zlib${color_end} ${text_dim}---------------${color_end} ${text_dim}${color_red_light}必需${color_end} ${text_dim}本地构建 zlib${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}iconv${color_end} ${text_dim}--------------${color_end} ${text_dim}${color_red_light}必需${color_end} ${text_dim}本地构建 iconv${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}icu${color_end} ${text_dim}----------------${color_end} ${text_dim}${color_yellow_light}可选${color_end} ${text_dim}本地构建 ICU${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}openssl${color_end} ${text_dim}------------${color_end} ${text_dim}${color_red_light}必需${color_end} ${text_dim}本地构建 openssl${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}boost${color_end} ${text_dim}--------------${color_end} ${text_dim}${color_red_light}必需${color_end} ${text_dim}下载、提取并构建 boost 库文件${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}libtorrent${color_end} ${text_dim}---------${color_end} ${text_dim}${color_red_light}必需${color_end} ${text_dim}本地构建 libtorrent${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}double_conversion${color_end} ${text_dim}--${color_end} ${text_dim}${color_red_light}必需${color_end} ${text_dim}在现代操作系统上作为 cmake + Qt6 构建组件${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}qtbase${color_end} ${text_dim}-------------${color_end} ${text_dim}${color_red_light}必需${color_end} ${text_dim}本地构建 qtbase${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}qttools${color_end} ${text_dim}------------${color_end} ${text_dim}${color_red_light}必需${color_end} ${text_dim}本地构建 qttools${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}qbittorrent${color_end} ${text_dim}--------${color_end} ${text_dim}${color_red_light}必需${color_end} ${text_dim}本地构建 qbittorrent${color_end}"
+			printf '\n%b\n' " ${text_bold}${text_underlined}env help - 支持导出的环境变量${color_end}"
+			printf '\n%b\n' " ${text_dim}${color_magenta_light}export qbt_libtorrent_version=\"\"${color_end} ${text_dim}--------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}1.2 - 2.0${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_qt_version=\"\"${color_end} ${text_dim}----------------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}5 - 5.15 - 6 - 6.2 - 6.3 等等${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_build_tool=\"\"${color_end} ${text_dim}----------------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}qmake - cmake${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_cross_name=\"\"${color_end} ${text_dim}----------------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}x86_64 - aarch64 - armv7 - armhf${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_patches_url=\"\"${color_end} ${text_dim}---------------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}userdocs/qbittorrent-nox-static.${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_libtorrent_tag=\"\"${color_end} ${text_dim}------------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}输入有效的 libtorrent git 标签或分支${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_qbittorrent_tag=\"\"${color_end} ${text_dim}-----------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}输入有效的 qbittorrent git 标签或分支${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_boost_tag=\"\"${color_end} ${text_dim}-----------------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}输入有效的 boost git 标签或分支${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_qt_tag=\"\"${color_end} ${text_dim}--------------------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}输入有效的 Qt git 标签或分支${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_workflow_files=\"\"${color_end} ${text_dim}------------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}是 否 - 使用 qbt-workflow-files 来管理依赖${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_workflow_artifacts=\"\"${color_end} ${text_dim}--------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}是 否 - 使用 qbt_workflow_artifacts 来管理依赖${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_cache_dir=\"\"${color_end} ${text_dim}-----------------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}路径 为空 - 提供一个缓存目录的路径${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_libtorrent_master_jamfile=\"\"${color_end} ${text_dim}-${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}是 否 - 使用 RC 分支而不是发布版的 jamfile${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_optimise_strip=\"\"${color_end} ${text_dim}------------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}是 否 - 剥离二进制文件 - 不能与 debug 一起使用${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_build_debug=\"\"${color_end} ${text_dim}---------------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}是 否 - 调试构建 - 不能与 strip 一起使用${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_standard=\"\"${color_end} ${text_dim}------------------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}14 - 17 - 20 - 23 - gcc 的 C 标准 - 用于旧的构建组合${color_end}"
+			printf '%b\n' " ${text_dim}${color_magenta_light}导出 qbt_static_ish=\"\"${color_end} ${text_dim}----------------${color_end} ${text_dim}${color_red_light}选项${color_end} ${text_dim}是 否 - libc 链接 - 动态链接到 libc${color_end}"
 			_print_env
 			exit
 			;;
 		-h-b | --help-build-directory)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " Default build location: ${color_cyan}${qbt_install_dir_short}${color_end}"
-			printf '\n%b\n' " ${color_blue_light}-b${color_end} or ${color_blue_light}--build-directory${color_end} to set the location of the build directory."
-			printf '\n%b\n' " ${color_yellow}Paths are relative to the script location. I recommend that you use a full path.${color_end}"
-			printf '\n%b\n' " ${text_dim}${unicode_blue_light_circle} Usage example:${color_end} ${text_dim}${color_green}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${text_dim}${color_magenta_light}all${color_end} ${text_dim}- Will install all modules and build libtorrent to the default build location${color_end}"
-			printf '\n%b\n' " ${text_dim}${unicode_blue_light_circle} Usage example:${color_end} ${text_dim}${color_green}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${text_dim}${color_magenta_light}module${color_end} ${text_dim}- Will install a single module to the default build location${color_end}"
-			printf '\n%b\n\n' " ${text_dim}${unicode_blue_light_circle} Usage example:${color_end} ${text_dim}${color_green}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${text_dim}${color_magenta_light}module${color_end} ${color_blue_light}-b${color_end} ${text_dim}${color_cyan_light}\"\$HOME/build\"${color_end} ${text_dim}- will specify a custom build directory and install a specific module use to that custom location${color_end}"
+		printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这里是针对此标志的帮助描述:${color_end}"
+		printf '\n%b\n' " 默认构建位置: ${color_cyan}${qbt_install_dir_short}${color_end}"
+		printf '\n%b\n' " ${color_blue_light}-b${color_end} 或 ${color_blue_light}--build-directory${color_end} 用于设置构建目录的位置。"
+		printf '\n%b\n' " ${color_yellow}路径是相对于脚本位置的。我建议您使用完整路径.${color_end}"
+		printf '\n%b\n' " ${text_dim}${unicode_blue_light_circle} 用法示例:${color_end} ${text_dim}${color_green}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${text_dim}${color_magenta_light}all${color_end} ${text_dim}- 将安装所有模块并将 libtorrent 构建到默认构建位置${color_end}"
+		printf '\n%b\n' " ${text_dim}${unicode_blue_light_circle} 用法示例:${color_end} ${text_dim}${color_green}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${text_dim}${color_magenta_light}module${color_end} ${text_dim}- 将安装单个模块到默认构建位置${color_end}"
+		printf '\n%b\n\n' " ${text_dim}${unicode_blue_light_circle} 用法示例:${color_end} ${text_dim}${color_green}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${text_dim}${color_magenta_light}module${color_end} ${color_blue_light}-b${color_end} ${text_dim}${color_cyan_light}\"\$HOME/build\"${color_end} ${text_dim}- 将指定自定义构建目录并将特定模块安装到该自定义位置${color_end}"
 			exit
 			;;
 		-h-bs-p | --help-boot-strap-patches)
@@ -2136,168 +2136,168 @@ while (("${#}")); do
 			exit
 			;;
 		-h-bs-r | --help-boot-strap-release)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' "${color_red_light} Github action specific. You probably dont need it${color_end}"
-			printf '\n%b\n' " This switch creates some github release template files in this directory"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这里是针对此标志的帮助描述:${color_end}"
+			printf '\n%b\n' "${color_red_light} 仅适用于 Github 操作。你可能不需要它${color_end}"
+			printf '\n%b\n' " 这个开关在当前目录下创建一些 Github 发布模板文件"
 			printf '\n%b\n' " ${qbt_install_dir_short}/release_info"
-			printf '\n%b\n\n' "${color_green_light} Usage:${color_end} ${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_blue_light}-bs-r${color_end}"
+			printf '\n%b\n\n' "${color_green_light} 用法:${color_end} ${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_blue_light}-bs-r${color_end}"
 			exit
 			;;
 		-h-bs-ma | --help-boot-strap-multi-arch)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " ${unicode_red_circle}${color_red_light} Github action and Alpine specific. You probably dont need it${color_end}"
-			printf '\n%b\n' " This switch bootstraps the musl cross build files needed for any provided and supported architecture"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这里是针对此标志的帮助描述:${color_end}"
+			printf '\n%b\n' " ${unicode_red_circle}${color_red_light} 适用于 Github 操作和 Alpine。你可能不需要它${color_end}"
+			printf '\n%b\n' " 这个开关启动 musl 交叉构建所需的文件，适用于任何提供和支持的架构"
 			printf '\n%b\n' " ${unicode_yellow_circle} armhf"
 			printf '%b\n' " ${unicode_yellow_circle} armv7"
 			printf '%b\n' " ${unicode_yellow_circle} aarch64"
-			printf '\n%b\n' "${color_green_light} Usage:${color_end} ${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_blue_light}-bs-ma ${qbt_cross_name:-aarch64}${color_end}"
-			printf '\n%b\n\n' " ${unicode_yellow_circle} You can also set it as a variable to trigger cross building: ${color_blue_light}export qbt_cross_name=${qbt_cross_name:-aarch64}${color_end}"
+			printf '\n%b\n' "${color_green_light} 用法:${color_end} ${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_blue_light}-bs-ma ${qbt_cross_name:-aarch64}${color_end}"
+			printf '\n%b\n\n' " ${unicode_yellow_circle} 你也可以将其设置为一个变量来触发交叉构建: ${color_blue_light}export qbt_cross_name=${qbt_cross_name:-aarch64}${color_end}"
 			exit
 			;;
 		-h-bs-a | --help-boot-strap-all)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " ${unicode_red_circle}${color_red_light} Github action specific and Alpine only. You probably dont need it${color_end}"
-			printf '\n%b\n' " Performs all bootstrapping options"
-			printf '\n%b\n' "${color_green_light} Usage:${color_end} ${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_blue_light}-bs-a${color_end}"
-			printf '\n%b\n' " ${unicode_yellow_circle} ${color_yellow_light}Patches${color_end}"
-			printf '%b\n' " ${unicode_yellow_circle} ${color_yellow_light}Release info${color_end}"
-			printf '%b\n' " ${unicode_yellow_circle} ${color_yellow_light}Cmake and ninja build${color_end} if the ${color_blue_light}-c${color_end} flag is passed"
-			printf '%b\n' " ${unicode_yellow_circle} ${color_yellow_light}Multi arch${color_end} if the ${color_blue_light}-ma${color_end} flag is passed"
-			printf '\n%b\n' " Equivalent of doing: ${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_blue_light}-bs -bs-r${color_end}"
-			printf '\n%b\n\n' " And with ${color_blue_light}-c${color_end} and ${color_blue_light}-ma${color_end} : ${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_blue_light}-bs -bs-c -bs-ma -bs-r ${color_end}"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这里是针对此标志的帮助描述:${color_end}"
+			printf '\n%b\n' " ${unicode_red_circle}${color_red_light} 仅限于 Github 操作和 Alpine。你可能不需要它${color_end}"
+			printf '\n%b\n' " 执行所有引导选项"
+			printf '\n%b\n' "${color_green_light} 用法:${color_end} ${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_blue_light}-bs-a${color_end}"
+			printf '\n%b\n' " ${unicode_yellow_circle} ${color_yellow_light}打补丁${color_end}"
+			printf '%b\n' " ${unicode_yellow_circle} ${color_yellow_light}发布信息${color_end}"
+			printf '%b\n' " ${unicode_yellow_circle} ${color_yellow_light}如果传递了 ${color_blue_light}-c${color_end} 标志，则进行 Cmake 和 Ninja 构建${color_end}"
+			printf '%b\n' " ${unicode_yellow_circle} ${color_yellow_light}如果传递了 ${color_blue_light}-ma${color_end} 标志，则执行多架构构建${color_end}"
+			printf '\n%b\n' " 相当于执行：${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_blue_light}-bs -bs-r${color_end}"
+			printf '\n%b\n\n' " 并且使用 ${color_blue_light}-c${color_end} 和 ${color_blue_light}-ma${color_end}：${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_blue_light}-bs -bs-c -bs-ma -bs-r ${color_end}"
 			exit
 			;;
 		-h-bt | --help-boost-version)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " This will let you set a specific version of boost to use with older build combos"
-			printf '\n%b\n' " ${unicode_blue_light_circle} Usage example: ${color_blue_light}-bt boost-1.81.0${color_end}"
-			printf '\n%b\n\n' " ${unicode_blue_light_circle} Usage example: ${color_blue_light}-bt boost-1.82.0.beta1${color_end}"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " 这将允许您设置要与旧版本构建组合使用的特定版本的 boost"
+			printf '\n%b\n' " ${unicode_blue_light_circle} 使用示例: ${color_blue_light}-bt boost-1.81.0${color_end}"
+			printf '\n%b\n\n' " ${unicode_blue_light_circle} 使用示例: ${color_blue_light}-bt boost-1.82.0.beta1${color_end}"
 			exit
 			;;
 		-h-c | --help-cmake)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " This flag can change the build process in a few ways."
-			printf '\n%b\n' " ${unicode_yellow_circle} Use cmake to build libtorrent."
-			printf '%b\n' " ${unicode_yellow_circle} Use cmake to build qbittorrent."
-			printf '\n%b\n\n' " ${unicode_yellow_circle} You can use this flag with ICU and qtbase will use ICU instead of iconv."
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " 这个标志可以以几种方式改变构建过程。"
+			printf'\n%b\n' " ${unicode_yellow_circle} 使用 cmake 来构建 libtorrent。"
+			printf'%b\n' " ${unicode_yellow_circle} 使用 cmake 来构建 qbittorrent。"
+			printf '\n%b\n\n' " ${unicode_yellow_circle} 您可以使用此标志与 ICU，qtbase 将使用 ICU 而不是 iconv。"
 			exit
 			;;
 		-h-cd | --help-cache-directory)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " This will let you set a path of a directory that contains cached github repos of modules"
-			printf '\n%b\n' " ${unicode_yellow_circle} Cached apps folder names must match the module name. Case and spelling"
-			printf '\n%b\n' " For example: ${color_cyan_light}~/cache_dir/qbittorrent${color_end}"
-			printf '\n%b\n' " Additonal flags supported: ${color_cyan_light}rm${color_end} - remove the cache directory and exit"
-			printf '\n%b\n' " Additonal flags supported: ${color_cyan_light}bs${color_end} - download cache for all activated modules then exit"
-			printf '\n%b\n' " ${unicode_blue_light_circle} Usage example: ${color_blue_light}-cd ~/cache_dir${color_end}"
-			printf '\n%b\n' " ${unicode_blue_light_circle} Usage example: ${color_blue_light}-cd ~/cache_dir rm${color_end}"
-			printf '\n%b\n\n' " ${unicode_blue_light_circle} Usage example: ${color_blue_light}-cd ~/cache_dir bs${color_end}"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " 这将允许您设置包含模块的缓存 github 仓库的目录路径"
+			printf '\n%b\n' " ${unicode_yellow_circle} 缓存的应用程序文件夹名称必须与模块名称匹配。大小写和拼写"
+			printf '\n%b\n' " 例如: ${color_cyan_light}~/cache_dir/qbittorrent${color_end}"
+			printf '\n%b\n' " 支持的额外标志: ${color_cyan_light}rm${color_end} - 删除缓存目录并退出"
+			printf '\n%b\n' " 支持的额外标志: ${color_cyan_light}bs${color_end} - 下载所有已激活模块的缓存，然后退出"
+			printf '\n%b\n' " ${unicode_blue_light_circle} 使用示例: ${color_blue_light}-cd ~/cache_dir${color_end}"
+			printf '\n%b\n' " ${unicode_blue_light_circle} 使用示例: ${color_blue_light}-cd ~/cache_dir rm${color_end}"
+			printf '\n%b\n\n' " ${unicode_blue_light_circle} 使用示例: ${color_blue_light}-cd ~/cache_dir bs${color_end}"
 			exit
 			;;
 		-h-d | --help-debug)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n\n' " Enables debug symbols for libtorrent and qbitorrent when building - required for gdb backtrace"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n\n' " 在构建时为 libtorrent 和 qbitorrent 启用调试符号 - gdb 回溯所需"
 			exit
 			;;
 		-h-n | --help-no-delete)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " Skip all delete functions for selected modules to leave source code directories behind."
-			printf '\n%b\n' " ${text_dim}This flag is provided with no arguments.${color_end}"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " 跳过所有选定模块的删除函数，以保留源代码目录。"
+			printf '\n%b\n' " ${text_dim}此标志不带任何参数。${color_end}"
 			printf '\n%b\n\n' " ${color_blue_light}-n${color_end}"
 			exit
 			;;
 		-h-i | --help-icu)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " Use ICU libraries when building qBittorrent. Final binary size will be around ~50Mb"
-			printf '\n%b\n' " ${text_dim}This flag is provided with no arguments.${color_end}"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " 在构建 qBittorrent 时使用 ICU 库。最终二进制文件大小约为 ~50Mb"
+			printf '\n%b\n' " ${text_dim}此标志不带任何参数。${color_end}"
 			printf '\n%b\n\n' " ${color_blue_light}-i${color_end}"
 			exit
 			;;
 		-h-m | --help-master)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " Always use the master branch for ${color_green}libtorrent RC_${qbt_libtorrent_version//./_}${color_end}"
-			printf '\n%b\n' " Always use the master branch for ${color_green}qBittorrent"
-			printf '\n%b\n' " ${text_dim}This flag is provided with no arguments.${color_end}"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " 始终使用 ${color_green}libtorrent RC_${qbt_libtorrent_version//./_}${color_end} 的主分支"
+			printf '\n%b\n' " 始终使用 qBittorrent 的主分支"
+			printf '\n%b\n' " ${text_dim}此标志不带任何参数。${color_end}"
 			printf '\n%b\n\n' " ${color_blue_light}-lm${color_end}"
 			exit
 			;;
 		-h-ma | --help-multi-arch)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " ${unicode_red_circle}${color_red_light} Github action and Alpine specific. You probably dont need it${color_end}"
-			printf '\n%b\n' " This switch will make the script use the cross build configuration for these supported architectures"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " ${unicode_red_circle}${color_red_light} 仅适用于 Github action 和 Alpine。您可能不需要它${color_end}"
+			printf '\n%b\n' " 此开关将使脚本使用这些支持的架构的交叉构建配置"
 			printf '\n%b\n' " ${unicode_yellow_circle} armhf"
 			printf '%b\n' " ${unicode_yellow_circle} armv7"
 			printf '%b\n' " ${unicode_yellow_circle} aarch64"
-			printf '\n%b\n' "${color_green_light} Usage:${color_end} ${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_blue_light}-bs-ma ${qbt_cross_name:-aarch64}${color_end}"
-			printf '\n%b\n\n' " ${unicode_yellow_circle} You can also set it as a variable to trigger cross building: ${color_blue_light}export qbt_cross_name=${qbt_cross_name:-aarch64}${color_end}"
+			printf '\n%b\n' "${color_green_light} 用法:${color_end} ${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_blue_light}-bs-ma ${qbt_cross_name:-aarch64}${color_end}"
+			printf '\n%b\n\n' " ${unicode_yellow_circle} 您还可以将其设置为变量以触发交叉构建: ${color_blue_light}export qbt_cross_name=${qbt_cross_name:-aarch64}${color_end}"
 			exit
 			;;
 		-h-lm | --help-libtorrent-master)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " Always use the master branch for ${color_green}libtorrent-${qbt_libtorrent_version}${color_end}"
-			printf '\n%b\n' " This master that will be used is: ${color_green}RC_${qbt_libtorrent_version//./_}${color_end}"
-			printf '\n%b\n' " ${text_dim}This flag is provided with no arguments.${color_end}"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " 始终使用 ${color_green}libtorrent-${qbt_libtorrent_version}${color_end} 的主分支"
+			printf '\n%b\n' " 将使用的主分支是: ${color_green}RC_${qbt_libtorrent_version//./_}${color_end}"
+			printf '\n%b\n' " ${text_dim}此标志不带任何参数.${color_end}"
 			printf '\n%b\n\n' " ${color_blue_light}-lm${color_end}"
 			exit
 			;;
 		-h-lt | --help-libtorrent-tag)
 			if [[ ! "${github_tag[libtorrent]}" =~ (error_tag|error_22) ]]; then
-				printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-				printf '\n%b\n' " Use a provided libtorrent tag when cloning from github."
-				printf '\n%b\n' " ${color_yellow}You can use this flag with this help command to see the value if called before the help option.${color_end}"
+				printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+				printf '\n%b\n' " 在从 github 克隆时使用提供的 libtorrent 标签."
+				printf '\n%b\n' " ${color_yellow}您可以使用此标志与此帮助命令一起查看值（如果在帮助选项之前调用）。${color_end}"
 				printf '\n%b\n' " ${color_green}${qbt_working_dir_short}/$(basename -- "$0")${color_end}${color_blue_light} -lt ${color_cyan_light}${github_tag[libtorrent]}${color_end} ${color_blue_light}-h-lt${color_end}"
-				printf '\n%b\n' " ${text_dim}This flag must be provided with arguments.${color_end}"
+				printf '\n%b\n' " ${text_dim}此标志必须提供参数.${color_end}"
 				printf '\n%b\n' " ${color_blue_light}-lt${color_end} ${color_cyan_light}${github_tag[libtorrent]}${color_end}"
 			fi
 			printf '\n'
 			exit
 			;;
 		-h-o | --help-optimize)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " ${unicode_yellow_circle} ${color_yellow_light}Warning:${color_end} using this flag will mean your static build is limited a CPU that matches the host spec"
-			printf '\n%b\n' " ${unicode_blue_light_circle} Usage example: ${color_blue_light}-o${color_end}"
-			printf '\n%b\n\n' " Additonal flags used: ${color_cyan_light}-march=native${color_end}"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " ${unicode_yellow_circle} ${color_yellow_light}警告:${color_end} 使用此标志将意味着您的静态构建受限于与宿主规格匹配的 CPU"
+			printf '\n%b\n' " ${unicode_blue_light_circle} 用法示例: ${color_blue_light}-o${color_end}"
+			printf '\n%b\n\n' " 使用的其他标志: ${color_cyan_light}-march=native${color_end}"
 			exit
 			;;
 		-h-p | --help-proxy)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " Specify a proxy URL and PORT to use with curl and git"
-			printf '\n%b\n' " ${unicode_blue_light_circle} Usage examples:"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " 指定用于 curl 和 git 的代理 URL 和端口"
+			printf '\n%b\n' " ${unicode_blue_light_circle} 用法示例:"
 			printf '\n%b\n' " ${color_blue_light}-p${color_end} ${color_cyan_light}username:password@https://123.456.789.321:8443${color_end}"
 			printf '\n%b\n' " ${color_blue_light}-p${color_end} ${color_cyan_light}https://proxy.com:12345${color_end}"
-			printf '\n%b\n' " ${unicode_yellow_circle} Call this before the help option to see outcome dynamically:"
+			printf '\n%b\n' " ${unicode_yellow_circle} 在帮助选项之前调用以动态查看结果:"
 			printf '\n%b\n\n' " ${color_blue_light}-p${color_end} ${color_cyan_light}https://proxy.com:12345${color_end} ${color_blue_light}-h-p${color_end}"
-			[[ -n "${qbt_curl_proxy[*]}" ]] && printf '%b\n' " proxy command: ${color_cyan_light}${qbt_curl_proxy[*]}${text_newline}${color_end}"
+			[[ -n "${qbt_curl_proxy[*]}" ]] && printf '%b\n' " 代理命令: ${color_cyan_light}${qbt_curl_proxy[*]}${text_newline}${color_end}"
 			exit
 			;;
 		-h-pr | --help-patch-repo)
 			_apply_patches bootstrap-help
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " Specify a username and repo to use patches hosted on github${color_end}"
-			printf '\n%b\n' " ${unicode_yellow_circle} ${color_yellow_light}There is a specific github directory format you need to use with this flag${color_end}"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " 指定用户名和存储库以使用托管在 github 上的补丁${color_end}"
+			printf '\n%b\n' " ${unicode_yellow_circle} ${color_yellow_light}您需要使用特定的 github 目录格式来使用此标志${color_end}"
 			printf '\n%b\n' " ${color_cyan_light}patches/libtorrent/${app_version[libtorrent]}/patch${color_end}"
-			printf '%b\n' " ${color_cyan_light}patches/libtorrent/${app_version[libtorrent]}/Jamfile${color_end} ${color_red_light}(defaults to branch master)${color_end}"
+			printf '%b\n' " ${color_cyan_light}patches/libtorrent/${app_version[libtorrent]}/Jamfile${color_end} ${color_red_light}(默认为主分支)${color_end}"
 			printf '\n%b\n' " ${color_cyan_light}patches/qbittorrent/${app_version[qbittorrent]}/patch${color_end}"
-			printf '\n%b\n' " ${unicode_yellow_circle} ${color_yellow_light}If an installation tag matches a hosted tag patch file, it will be automatically used.${color_end}"
-			printf '\n%b\n' " The tag name will alway be an abbreviated version of the default or specificed tag.${color_end}"
-			printf '\n%b\n\n' " ${unicode_blue_light_circle} ${color_green}Usage example:${color_end} ${color_blue_light}-pr usnerame/repo${color_end}"
+			printf '\n%b\n' " ${unicode_yellow_circle} ${color_yellow_light}如果安装标签与托管的标签补丁文件匹配，则将自动使用它。${color_end}"
+			printf '\n%b\n' " 标签名称将始终是默认或指定标签的缩写版本。${color_end}"
+			printf '\n%b\n\n' " ${unicode_blue_light_circle} ${color_green}用法示例:${color_end} ${color_blue_light}-pr usnerame/repo${color_end}"
 			exit
 			;;
 		-h-qm | --help-qbittorrent-master)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " Always use the master branch for ${color_green}qBittorrent${color_end}"
-			printf '\n%b\n' " This master that will be used is: ${color_green}master${color_end}"
-			printf '\n%b\n' " ${text_dim}This flag is provided with no arguments.${color_end}"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " 总是使用 ${color_green}qBittorrent${color_end} 的主分支"
+			printf '\n%b\n' " 将要使用的主分支是: ${color_green}master${color_end}"
+			printf '\n%b\n' " ${text_dim}此标志不带任何参数。${color_end}"
 			printf '\n%b\n\n' " ${color_blue_light}-qm${color_end}"
 			exit
 			;;
 		-h-qt | --help-qbittorrent-tag)
 			if [[ ! "${github_tag[qbittorrent]}" =~ (error_tag|error_22) ]]; then
-				printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-				printf '\n%b\n' " Use a provided qBittorrent tag when cloning from github."
-				printf '\n%b\n' " ${color_yellow}You can use this flag with this help command to see the value if called before the help option.${color_end}"
+				printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+				printf '\n%b\n' " 在从 github 克隆时使用提供的 qBittorrent 标签。"
+				printf '\n%b\n' " ${color_yellow}您可以使用此标志与此帮助命令一起使用，以查看在调用帮助选项之前调用时的值。${color_end}"
 				printf '\n%b\n' " ${color_green}${qbt_working_dir_short}/$(basename -- "$0")${color_end}${color_blue_light} -qt ${color_cyan_light}${github_tag[qbittorrent]}${color_end} ${color_blue_light}-h-qt${color_end}"
-				printf '\n%b\n' " ${text_dim}This flag must be provided with arguments.${color_end}"
+				printf '\n%b\n' " ${text_dim}此标志必须提供参数。${color_end}"
 				printf '\n%b\n' " ${color_blue_light}-qt${color_end} ${color_cyan_light}${github_tag[qbittorrent]}${color_end}"
 			fi
 			printf '\n'
@@ -2305,51 +2305,51 @@ while (("${#}")); do
 			;;
 		-h-qtt | --help-qt-tag)
 			if [[ ! "${github_tag[qtbase]}" =~ (error_tag|error_22) ]]; then
-				printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-				printf '\n%b\n' " Use a provided Qt tag when cloning from github."
-				printf '\n%b\n' " ${color_yellow}You can use this flag with this help command to see the value if called before the help option.${color_end}"
+				printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+				printf '\n%b\n' " 在从 github 克隆时使用提供的 Qt 标签。"
+				printf '\n%b\n' " ${color_yellow}您可以使用此标志与此帮助命令一起使用，以查看在调用帮助选项之前调用时的值。${color_end}"
 				printf '\n%b\n' " ${color_green}${qbt_working_dir_short}/$(basename -- "$0")${color_end}${color_blue_light} -qt ${color_cyan_light}${github_tag[qtbase]}${color_end} ${color_blue_light}-h-qt${color_end}"
-				printf '\n%b\n' " ${text_dim}This flag must be provided with arguments.${color_end}"
+				printf '\n%b\n' " ${text_dim}此标志必须提供参数。${color_end}"
 				printf '\n%b\n' " ${color_blue_light}-qt${color_end} ${color_cyan_light}${github_tag[qtbase]}${color_end}"
 			fi
 			printf '\n'
 			exit
 			;;
 		-h-s | --help-strip)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " Strip the qbittorrent-nox binary of unneeded symbols to decrease file size"
-			printf '\n%b\n' " ${unicode_yellow_circle} Static musl builds don't work with qBittorrents built in stacktrace."
-			printf '\n%b\n' " If you need to debug a build with gdb you must build a debug build using the flag ${color_blue_light}-d${color_end}"
-			printf '\n%b\n' " ${text_dim}This flag is provided with no arguments.${color_end}"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " 剥离qbittorrent-nox二进制文件中不需要的符号，以减小文件大小"
+			printf '\n%b\n' " ${unicode_yellow_circle} 静态musl构建与qBittorrent内置的堆栈跟踪不兼容。"
+			printf '\n%b\n' " 如果您需要使用gdb调试构建，则必须使用标志${color_blue_light}-d${color_end}构建调试版本。"
+			printf '\n%b\n' " ${text_dim}此标志不需要提供参数。${color_end}"
 			printf '\n%b\n\n' " ${color_blue_light}-s${color_end}"
 			exit
 			;;
 		-h-si | --help-static-ish)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " Do not statically link libc (glibc/muslc) when building qbittorrent-nox"
-			printf '\n%b\n' " ${text_dim}This flag is provided with no arguments.${color_end}"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " 构建qbittorrent-nox时不要静态链接libc（glibc/muslc）"
+			printf '\n%b\n' " ${text_dim}此标志不需要提供参数。${color_end}"
 			printf '\n%b\n\n' " ${color_blue_light}-si${color_end}"
 			exit
 			;;
 		-h-sdu | --help-script-debug-urls)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " ${unicode_blue_light_circle} This will print out all the ${color_yellow_light}_set_module_urls${color_end} array info to check"
-			printf '\n%b\n\n' " ${unicode_blue_light_circle} Usage example: ${color_blue_light}-sdu${color_end}"
-			exit
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " ${unicode_blue_light_circle} 这将打印出所有${color_yellow_light}_set_module_urls${color_end}数组的信息以供检查"
+			printf '\n%b\n\n' " ${unicode_blue_light_circle} 用法示例: ${color_blue_light}-sdu${color_end}"
+						exit
 			;;
 		-h-wf | --help-workflow)
-			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}Here is the help description for this flag:${color_end}"
-			printf '\n%b\n' " ${unicode_yellow_circle} Use archives from ${color_cyan_light}https://github.com/userdocs/qbt-workflow-files/releases/latest${color_end}"
-			printf '\n%b\n' " ${unicode_yellow_circle} ${color_yellow_light}Warning:${color_end} If you set a custom version for supported modules it will override and disable workflows as a source for that module"
-			printf '\n%b\n\n' " ${unicode_blue_light_circle} Usage example: ${color_blue_light}-wf${color_end}"
+			printf '\n%b\n' " ${unicode_cyan_light_circle} ${text_bold}${text_underlined}这是该标志的帮助描述:${color_end}"
+			printf '\n%b\n' " ${unicode_yellow_circle} 使用来自${color_cyan_light}https://github.com/userdocs/qbt-workflow-files/releases/latest${color_end}的归档文件"
+			printf '\n%b\n' " ${unicode_yellow_circle} ${color_yellow_light}警告:${color_end} 如果您为支持的模块设置了自定义版本，它将覆盖并禁用工作流作为该模块的源"
+			printf '\n%b\n\n' " ${unicode_blue_light_circle} 用法示例: ${color_blue_light}-wf${color_end}"
 			exit
 			;;
-		--) # end argument parsing
+		--) # 结束参数解析
 			shift
 			break
 			;;
-		-*) # unsupported flags
-			printf '\n%b\n\n' " ${unicode_red_circle} Error: Unsupported flag ${color_red_light}${1}${color_end} - use ${color_green_light}-h${color_end} or ${color_green_light}--help${color_end} to see the valid options${color_end}" >&2
+		-*) # 不支持的标志
+			printf '\n%b\n\n' " ${unicode_red_circle} 错误: 不支持的标志 ${color_red_light}${1}${color_end} - 使用${color_green_light}-h${color_end}或${color_green_light}--help${color_end}查看有效选项${color_end}" >&2
 			exit 1
 			;;
 		*) # preserve positional arguments

@@ -6,33 +6,29 @@ on:
     inputs:
       distinct_id:
         description: "流程运行 ID"
-
       qbt_qbittorrent_tag:
         description: "qbittorrent版本选择 release-x.x.x"
-
       qbt_skip_icu:
         description: "取消 icu 依赖"
         required: true
         default: "yes"
         type: choice
         options: ["no", "yes"]
-
       qbt_workflow_files:
         description: "是否从 userdocs/qbt-workflow-files 下载源码"
         required: true
         default: "no"
         type: choice
         options: ["no", "yes"]
-
       skip_rerun:
-        description: "跳过重新运行"
+        description: "跳过重新运行？"
         required: true
+        default: true
         type: boolean
-
       retries:
-        description: "重试次数"
+        description: "重新运行重试次数"
         required: true
-        default: "2"
+        default: "1"
         type: choice
         options: ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
@@ -46,19 +42,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os_id: ["alpine"]
-        os_version_id: ["edge"]
-        qbt_cross_name: [ "armhf", "armv7", "aarch64", "x86_64", "x86" ]
-        # qbt_cross_name: [ "armel", "armhf", "armv7", "aarch64", "x86_64", "x86", "s390x", "powerpc", "ppc64el", "mips", "mipsel", "mips64", "mips64el", "riscv64", ]
+        os_id: [alpine]
+        os_version_id: [edge]
+        # qbt_cross_name: [armel,armhf,armv7,aarch64,x86_64,x86,s390x,powerpc,ppc64el,mips,mipsel,mips64,mips64el,riscv64]
+        qbt_cross_name: ["armhf", "armv7", "aarch64", "x86_64", "x86"]
         qbt_libtorrent_version: ["1.2", "2.0"]
         qbt_build_tool: ["", "cmake"]
         include:
           - qbt_build_tool: ""
             qbt_qt_version_name: "qt5-"
             qbt_qt_version: "5"
-
           - qbt_build_tool: "cmake"
-            qbt_qt_version_name: "qt6-"
+            qbt_qt_version_name: ""
             qbt_qt_version: "6"
 
     name: "qBittorrent-${{matrix.qbt_cross_name}}-${{matrix.qbt_qt_version_name}}libtorrent-v${{matrix.qbt_libtorrent_version}}"
@@ -70,39 +65,42 @@ jobs:
       - name: Checkout ${{github.event.inputs.distinct_id}}
         uses: actions/checkout@v4.1.2
 
-      - name: Docker 初始环境 ${{github.event.inputs.distinct_id}}
+      - name: Host - 初始环境 ${{github.event.inputs.distinct_id}}
         run: |
-          sudo rm -f /etc/apt/apt.conf.d/*
-          echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' | sudo tee /etc/apt/apt.conf.d/01keep-debs
-          echo -e 'Acquire::https::Verify-Peer "false";\nAcquire::https::Verify-Host "false";' | sudo tee /etc/apt/apt.conf.d/99-phased-updates
-          sudo -E apt-get -qq update
-          sudo -E apt-get -qq install lunar libpipeline1 qemu-user-static binfmt-support
-          # echo "qbt_qt_tag=" >> env.custom
-          # echo "qbt_cache_dir= >> env.custom
-          # echo "qbt_boost_tag=" >> env.custom
-          # echo "qbt_libtorrent_tag=" >> env.custom
-          echo "qbt_build_debug=no" >> env.custom
-          echo "qbt_optimise_strip=yes" >> env.custom
-          echo "qbt_workflow_artifacts=no" >> env.custom
-          echo "qbt_libtorrent_master_jamfile=no" >> env.custom
-          echo "qbt_patches_url=${{github.repository}}" >> env.custom
-          echo "qbt_revision_url=${{github.repository}}" >> env.custom
+          echo 'APT::Get::Always-Include-Phased-Updates "false";' | sudo tee /etc/apt/apt.conf.d/99-phased-updates
+          echo -e 'Package: *\nPin: release n=lunar\nPin-Priority: 50' | sudo tee /etc/apt/preferences
+          echo 'deb http://archive.ubuntu.com/ubuntu/ lunar main universe restricted' | sudo tee /etc/apt/sources.list.d/lunar.list
+          sudo apt-get update
+          sudo apt-get -y upgrade
+          sudo apt install -t lunar libpipeline1 qemu-user-static binfmt-support
+          echo "qbt_libtorrent_version=${{matrix.qbt_libtorrent_version}}" > env.custom
           echo "qbt_qt_version=${{matrix.qbt_qt_version}}" >> env.custom
           echo "qbt_build_tool=${{matrix.qbt_build_tool}}" >> env.custom
           echo "qbt_cross_name=${{matrix.qbt_cross_name}}" >> env.custom
+          echo "qbt_patches_url=${{github.repository}}" >> env.custom
           echo "qbt_skip_icu=${{github.event.inputs.qbt_skip_icu}}" >> env.custom
-          echo "qbt_qt_version_name=${{matrix.qbt_qt_version_name}}" >> env.custom
-          echo "qbt_libtorrent_version=${{matrix.qbt_libtorrent_version}}" >> env.custom
-          echo "qbt_workflow_files=${{github.event.inputs.qbt_workflow_files}}" >> env.custom
+          echo "qbt_boost_tag=" >> env.custom
+          echo "qbt_libtorrent_tag=" >> env.custom
+          echo "qbt_qt_tag=" >> env.custom
           echo "qbt_qbittorrent_tag=${{github.event.inputs.qbt_qbittorrent_tag}}" >> env.custom
+          echo "qbt_libtorrent_master_jamfile=no" >> env.custom
+          echo "qbt_workflow_files=${{github.event.inputs.qbt_workflow_files}}" >> env.custom
+          echo "qbt_workflow_artifacts=no" >> env.custom
+          echo "qbt_cache_dir=" >> env.custom
+          echo "qbt_optimise_strip=yes" >> env.custom
+          echo "qbt_build_debug=no" >> env.custom
+          echo "qbt_revision_url=${{github.repository}}" >> env.custom
+          echo "qbt_standard=17" >> env.custom
+          echo "qbt_static_ish=no" >> env.custom
           docker run --name multiarch -it -d --env-file env.custom -w /root -v ${{github.workspace}}:/root ${{matrix.os_id}}:${{matrix.os_version_id}}
           docker exec -w /root multiarch apk update
           docker exec -w /root multiarch apk add bash tzdata
 
-      - name: Docker 安装依赖  ${{github.event.inputs.distinct_id}}
-        run: |
-          docker exec -w /root multiarch bash qbittorrent-nox-static.sh -bs-a
-          if [[ -d patches ]]; then docker exec -w /root multiarch cp -r patches/* /root/${{ env.qbt_build_dir }}/patches; fi
+      - name: Docker - Bootstrap ${{github.event.inputs.distinct_id}}
+        run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh -bs-a
+
+      - name: Docker - Copy repo patches to build folder ${{github.event.inputs.distinct_id}}
+        run: if [[ -d patches ]]; then docker exec -w /root multiarch cp -r patches/* /root/${{env.qbt_build_dir}}/patches; fi
 
       - name: Docker - zlib-ng ${{github.event.inputs.distinct_id}}
         run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh zlib
@@ -133,34 +131,38 @@ jobs:
       - name: Docker - qttools ${{github.event.inputs.distinct_id}}
         run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh qttools
 
-      - name: Docker - qBittorrent ${{github.event.inputs.distinct_id}}
-        id: compile
+      - name: Docker - qbittorrent ${{github.event.inputs.distinct_id}}
         run: docker exec -w /root multiarch bash qbittorrent-nox-static.sh qbittorrent
 
       - name: Host - qBittorrent v5 transition
         run: |
           # When qBittorrent v5 is released, remove this
-          if [[ -f ${{ env.qbt_build_dir }}/release_info/disable-qt5 ]]; then
-            printf '%s\n' "disable_qt5=yes" >> $GITHUB_ENV
+          if [[ -f ${{env.qbt_build_dir}}/release_info/disable-qt5 ]]; then
+            echo "disable_qt5=yes" >> $GITHUB_ENV
           fi
 
-      - name: Docker - 发布信息 ${{ github.event.inputs.distinct_id }}
+      - name: Docker - Set release asset name ${{github.event.inputs.distinct_id}}
         if: env.disable_qt5 != 'yes' # 当qBittorrent v5发布时，删除这个
         run: |
-          docker exec -w /root/${{ env.qbt_build_dir }}/release_info multiarch bash -c 'mv *.md *.json '/root/${{ env.qbt_build_dir }}/completed''
-          docker exec -w /root/${{ env.qbt_build_dir }}/completed multiarch mv -f qbittorrent-nox ${{ matrix.qbt_cross_name }}-${{ matrix.qbt_qt_version_name }}qbittorrent-nox
+          docker exec -w /root/${{env.qbt_build_dir}}/completed multiarch mv -f qbittorrent-nox ${{matrix.qbt_cross_name}}-${{matrix.qbt_qt_version_name}}qbittorrent-nox
+          docker exec -w /root/${{env.qbt_build_dir}}/release_info multiarch bash -c 'mv *.md *.json '/root/${{env.qbt_build_dir}}/completed''
 
-      - name: 上传到 Artifacts ${{github.event.inputs.distinct_id}}
-        if: env.disable_qt5 != 'yes' && !cancelled()
+      # - name: Docker - upx compression ${{github.event.inputs.distinct_id}}
+      #   run: |
+      #     docker exec -w /root multiarch apk add upx
+      #     docker exec -w /root/${{env.qbt_build_dir}}/completed multiarch upx --brute --no-lzma ${{matrix.qbt_cross_name}}-${{matrix.qbt_qt_version_name}}qbittorrent-nox
+
+      - name: Host - Upload libtorrent-v${{matrix.qbt_libtorrent_version}}-qbittorrent-nox and release info artifact ${{github.event.inputs.distinct_id}}
+        if: env.disable_qt5 != 'yes' # When qBittorrent v5 is released, remove this
         uses: actions/upload-artifact@v4.3.1
         with:
-          name: libtorrent-v${{matrix.qbt_libtorrent_version}}-${{matrix.qbt_cross_name}}-${{matrix.qbt_qt_version_name}}qBittorrent-nox
+          name: libtorrent-v${{matrix.qbt_libtorrent_version}}-${{matrix.qbt_cross_name}}-${{matrix.qbt_qt_version_name}}qbittorrent-nox
           path: |
             ${{env.qbt_build_dir}}/completed/*
             !${{env.qbt_build_dir}}/completed/*.png
 
-      - name: graphs 上传到 Artifacts ${{github.event.inputs.distinct_id}}
-        if: matrix.qbt_build_tool == 'cmake' && env.disable_qt5 != 'yes' && !cancelled()
+      - name: Host - Upload cmake graphs artifact ${{github.event.inputs.distinct_id}}
+        if: matrix.qbt_build_tool == 'cmake' && env.disable_qt5 != 'yes' # When qBittorrent v5 is released, remove this
         uses: actions/upload-artifact@v4.3.1
         with:
           name: "${{matrix.qbt_cross_name}}-libtorrent-v${{matrix.qbt_libtorrent_version}}-graphs"
@@ -183,48 +185,51 @@ jobs:
           - qbt_libtorrent_version: "2.0"
             preview_release: false
 
-    name: "发布 libtorrent-v${{matrix.qbt_libtorrent_version}}-qBittorrent"
+    name: "Publish release libtorrent-v${{matrix.qbt_libtorrent_version}}"
 
     env:
       qbt_build_dir: "qbt-build"
 
     steps:
-      - name: Checkout ${{ github.event.inputs.distinct_id }}
+      - name: Checkout ${{github.event.inputs.distinct_id}}
         uses: actions/checkout@v4.1.2
 
-      - name: 下载 1.2 qBittorrent-nox 文件 ${{ github.event.inputs.distinct_id }}
+      - name: Pandoc - Bootstrap
+        run: |
+          pandoc_git_tag="$(git ls-remote -q -t --refs https://github.com/jgm/pandoc.git | awk '/tags\/[0-9]/{sub("refs/tags/", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
+          curl -sLo- "https://github.com/jgm/pandoc/releases/latest/download/pandoc-${pandoc_git_tag}-linux-amd64.tar.gz" | tar xzf - --strip-components 2 -C "$(pwd)" --exclude="share"
+
+      - name: Host - Download 1.2 qbittorrent-nox artifacts ${{github.event.inputs.distinct_id}}
         uses: actions/download-artifact@v4.1.4
         with:
           path: "1.2"
           pattern: libtorrent-v1.2-*-qbittorrent-nox
           merge-multiple: true
 
-      - name: 下载 2.0 qBittorrent-nox 文件 ${{ github.event.inputs.distinct_id }}
+      - name: Host - Download 2.0 qbittorrent-nox artifacts ${{github.event.inputs.distinct_id}}
         uses: actions/download-artifact@v4.1.4
         with:
           path: "2.0"
           pattern: libtorrent-v2.0-*-qbittorrent-nox
           merge-multiple: true
 
-      - name: Host - merge release-info ${{ github.event.inputs.distinct_id }}
+      - name: Host - merge release-info ${{github.event.inputs.distinct_id}}
         run: |
-          pandoc_git_tag="$(git ls-remote -q -t --refs https://github.com/jgm/pandoc.git | awk '/tags\/[0-9]/{sub("refs/tags/", ""); print $2 }' | awk '!/^$/' | sort -rV | head -n 1)"
-          curl -sLo- "https://github.com/jgm/pandoc/releases/latest/download/pandoc-${pandoc_git_tag}-linux-amd64.tar.gz" | tar xzf - --strip-components 2 -C "$(pwd)" --exclude="share"
-          if [[ ${{ matrix.qbt_libtorrent_version }} == "1.2" ]]; then
+          if [[ ${{matrix.qbt_libtorrent_version}} == "1.2" ]]; then
             for release in 1\.2/*-release.md; do
               [[ -f "${release}" ]] && release+=("${release}")
             done
             revision="$(jq -r .revision 1\.2/*-dependency-version.json | head -n1)"
           fi
 
-          if [[ ${{ matrix.qbt_libtorrent_version }} == "2.0" ]]; then
+          if [[ ${{matrix.qbt_libtorrent_version}} == "2.0" ]]; then
             for release in 2\.0/*-release.md; do
               [[ -f "${release}" ]] && release+=("${release}")
             done
             revision="$(jq -r .revision 2\.0/*-dependency-version.json | head -n1)"
           fi
 
-          readarray -t release_sorted < <(printf '%s\n' "${release[@]}" | sort)
+          readarray -t release_sorted < <(echo "${release[@]}" | sort)
 
           for dependency_version_files in 1\.2/*-dependency-version.json 2\.0/*-dependency-version.json; do
             if [[ -f "${dependency_version_files}" ]]; then
@@ -233,7 +238,7 @@ jobs:
             fi
           done
 
-          readarray -t dependency_version_sorted < <(printf '%s\n' "${dependency_version[@]}" | sort)
+          readarray -t dependency_version_sorted < <(echo "${dependency_version[@]}" | sort)
 
           paste -d '\n' "${release_sorted[@]}" | uniq | awk '!(NF && seen[$0]++) || /^>/' > "tmp-release.md"
           paste -d '\n' "${dependency_version_sorted[@]}" | uniq | awk '!(NF && seen[$0]++)' > "dependency-version.json"
@@ -241,20 +246,20 @@ jobs:
           sed -i "s|PLACEHOLDER|\"revision\": \"${revision}\"|" dependency-version.json
 
           ./pandoc --wrap=preserve -f gfm tmp-release.md -t gfm -o release.md
-          printf '%s\n' "release_tag=$(cat ${{ matrix.qbt_libtorrent_version }}/tag.md)" >> $GITHUB_ENV
-          printf '%s\n' "release_title=$(cat ${{ matrix.qbt_libtorrent_version }}/title.md)" >> $GITHUB_ENV
+          echo "release_tag=$(cat ${{matrix.qbt_libtorrent_version}}/tag.md)" >> $GITHUB_ENV
+          echo "release_title=$(cat ${{matrix.qbt_libtorrent_version}}/title.md)" >> $GITHUB_ENV
 
-      - name: 宿主-创建发布-标签-资产 ${{ github.event.inputs.distinct_id }}
+      - name: Host- Create release - tag - assets ${{github.event.inputs.distinct_id}}
         uses: ncipollo/release-action@v1
         with:
-          prerelease: "${{ matrix.preview_release }}"
-          artifacts: "${{ matrix.qbt_libtorrent_version }}/*-qbittorrent-nox,dependency-version.json"
+          prerelease: "${{matrix.preview_release}}"
+          artifacts: "${{matrix.qbt_libtorrent_version}}/*-qbittorrent-nox,dependency-version.json"
           replacesArtifacts: true
-          tag: "${{ env.release_tag }}"
-          name: "${{ env.release_title }}"
+          tag: "${{env.release_tag}}"
+          name: "${{env.release_title}}"
           bodyFile: "release.md"
           allowUpdates: true
-          token: "${{ github.TOKEN }}"
+          token: "${{github.TOKEN}}"
 
   rerun-on-failure:
     if: failure() && inputs.skip_rerun == '0'
@@ -264,10 +269,10 @@ jobs:
       actions: write
     runs-on: ubuntu-latest
     env:
-      GH_TOKEN: "${{secrets.GITHUB_TOKEN}}"
+      GH_TOKEN: "${{github.TOKEN}}"
     steps:
       - uses: actions/checkout@v4.1.2
-      - name: 编译失败后触发重新编译
+      - name: 失败时触发重新运行工作流程
         run: |
           inputs_retries="${{inputs.retries}}"
-          gh workflow run rerun.yml -f run_id=${{github.run_id}} -f attempts=${{github.run_attempt}} -f retries=${inputs_retries:-5}
+          gh workflow run rerun.yml -f run_id=${{github.run_id}} -f attempts=${{github.run_attempt}} -f retries=${inputs_retries:-1}
