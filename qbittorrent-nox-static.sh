@@ -492,7 +492,7 @@ _qbittorrent_build_cons() {
 
 _set_build_cons() {
 	if [[ $(_qbittorrent_build_cons) == "yes" && "${qbt_qt_version}" == "5" ]]; then
-		printf '\n%b\n\n' " ${text_blink}${unicode_red_light_circle}${color_end} ${color_yellow}qBittorrent ${color_magenta}${github_tag[qbittorrent]}${color_yellow} 不支持 ${color_red }Qt5${color_yellow}。请使用 ${color_green}Qt6${color_yellow} 或 qBittorrent ${color_green}v4${color_yellow} 标签。${color_end}"
+		printf '\n%b\n\n' " ${text_blink}${unicode_red_light_circle}${color_end} ${color_yellow}qBittorrent ${color_magenta}${github_tag[qbittorrent]}${color_yellow} 不支持 ${color_red}Qt5${color_yellow}。请使用 ${color_green}Qt6${color_yellow} 或 qBittorrent ${color_green}v4${color_yellow} 标签。${color_end}"
 		if [[ -d "${release_info_dir}" ]]; then touch "${release_info_dir}/disable-qt5"; fi # qbittorrent v5 transtion - workflow specific
 		exit                                                                                # non error exit to not upset github actions - just skip the step
 	fi
@@ -852,7 +852,7 @@ _set_module_urls() {
 	app_version[qttools]="$(printf '%s' "${github_tag[qttools]#v}" | sed 's/-lts-lgpl//g')"
 	app_version[qbittorrent]="${github_tag[qbittorrent]#release-}"
 	##########################################################################################################################################################
-	# Configure the source_archive_url associative array for all the applications this script uses and we call them as ${source_archive_url[app_name]}
+	# 为该脚本使用的所有应用程序配置 source_archive_url 关联数组，我们将它们称为 ${source_archive_url[app_name]}
 	##########################################################################################################################################################
 	if [[ "${os_id}" =~ ^(debian|ubuntu)$ ]]; then
 		source_archive_url[cmake_ninja]="https://github.com/userdocs/qbt-cmake-ninja-crossbuilds/releases/latest/download/${os_id}-${os_version_codename}-cmake-$(dpkg --print-architecture).tar.xz"
@@ -991,11 +991,11 @@ _installation_modules() {
 
 		printf '%b\n' "using gcc : : : <cflags>${qbt_optimize/*/${qbt_optimize} }-std=${qbt_cxx_standard} <cxxflags>${qbt_optimize/*/${qbt_optimize} }-std=${qbt_cxx_standard} ;${text_newline}using python : ${python_short_version} : /usr/bin/python${python_short_version} : /usr/include/python${python_short_version} : /usr/lib/python${python_short_version} ;" > "${HOME}/user-config.jam"
 
-		# printf the build directory.
+		# printf 构建目录。
 		printf '\n%b\n' " ${unicode_yellow_circle}${text_bold} 安装前缀${color_end} : ${color_cyan_light}${qbt_install_dir_short}${color_end}"
 
-		# Some basic help
-		printf '\n%b\n' " ${unicode_yellow_circle}${text_bold} 脚本帮助${color_end} : ${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_blue_light }-h${color_end}"
+		# 一些基本帮助
+		printf '\n%b\n' " ${unicode_yellow_circle}${text_bold} 脚本帮助${color_end}：${color_cyan_light}${qbt_working_dir_short}/$(basename -- "$0")${color_end} ${color_blue_light}-h${color_end}"
 	fi
 }
 #######################################################################################################################################################
@@ -1148,19 +1148,19 @@ _cache_dirs() {
 # This function is for downloading git releases based on their tag.
 #######################################################################################################################################################
 _download_folder() {
-	# Set this to avoid some warning when cloning some modules
+	# 设置此项以避免克隆某些模块时出现警告
 	_git_git config --global advice.detachedHead false
 
-	# If not using artifacts remove the source files in the build directory if present before we download or copy them again
+	# 如果不使用工件，请在我们再次下载或复制它们之前删除构建目录中的源文件（如果存在）
 	[[ -d "${qbt_install_dir}/${app_name}" ]] && rm -rf "${qbt_install_dir}/${app_name:?}"
 	[[ -d "${qbt_install_dir}/include/${app_name}" ]] && rm -rf "${qbt_install_dir}/include/${app_name:?}"
 
-	# if there IS NOT and app_name cache directory present in the path provided and we are bootstrapping then use this echo
+	# 如果提供的路径中不存在 app_name 缓存目录并且我们正在引导，则使用此 echo
 	if [[ "${qbt_cache_dir_options}" == "bs" && ! -d "${qbt_dl_folder_path}" ]]; then
 		printf '\n%b\n\n' " ${unicode_blue_light_circle} 将 ${color_magenta_light}${app_name}${color_end} 名称 ${color_yellow_light}${github_tag[${app_name}]}${color_end} 缓存到${color_cyan_light}${color_cyan_light}${qbt_dl_folder_path}${color_end}${color_end}来自${color_yellow_light}${color_yellow_light}${github_url[${app_name}]}${color_end}"
 	fi
 
-	# if cache dir is on and the app_name folder does not exist then get folder via cloning default source
+	# 如果缓存目录已打开并且 app_name 文件夹不存在，则通过克隆默认源获取文件夹
 	if [[ "${qbt_cache_dir_options}" != "bs" && ! -d "${qbt_dl_folder_path}" ]]; then
 		printf '\n%b\n\n' " ${unicode_blue_light_circle} 正在下载 ${color_magenta_light}${app_name}${color_end} 名称 ${color_yellow_light}${github_tag[${app_name}]}${color_end} to ${color_cyan_light}${color_cyan_light}${qbt_dl_folder_path}${color_end}${color_end} 下载到 ${color_yellow_light}${color_yellow_light}${github_url[${app_name}]}${color_end}"
 	fi
@@ -1176,7 +1176,7 @@ _download_folder() {
 		fi
 	fi
 
-	# if there IS a app_name cache directory present in the path provided and we are bootstrapping then use this
+	# 如果提供的路径中存在 app_name 缓存目录并且我们正在引导，则使用它
 	if [[ "${qbt_cache_dir_options}" == "bs" && -d "${qbt_dl_folder_path}" ]]; then
 		printf '\n%b\n\n' " ${unicode_green_circle} ${color_blue_light}${app_name}${color_end} - 正在更新目录 ${color_cyan_light}${qbt_dl_folder_path}${color_end}"
 		_pushd "${qbt_dl_folder_path}"
@@ -1208,13 +1208,13 @@ _download_folder() {
 	return
 }
 #######################################################################################################################################################
-# This function is for downloading source code archives
+# 该函数用于下载源代码档案
 #######################################################################################################################################################
 _download_file() {
 	if [[ -f "${qbt_dl_file_path}" && "${qbt_workflow_artifacts}" == "no" ]]; then
-		# This checks that the archive is not corrupt or empty checking for a top level folder and exiting if there is no result i.e. the archive is empty - so that we do rm and empty substitution
+		# 这会检查存档是否损坏或为空，检查顶级文件夹，如果没有结果则退出，即存档为空 - 这样我们就可以进行 rm 和空替换
 		_cmd grep -Eqom1 "(.*)[^/]" <(tar tf "${qbt_dl_file_path}")
-		# delete any existing extracted archives and archives
+		# 删除任何现有的解压档案和档案
 		rm -rf {"${qbt_install_dir:?}/$(tar tf "${qbt_dl_file_path}" | grep -Eom1 "(.*)[^/]")","${qbt_install_dir}/${app_name}.tar.xz"}
 		[[ -d "${qbt_install_dir}/${app_name}" ]] && rm -rf "${qbt_install_dir}/${app_name:?}"
 		[[ -d "${qbt_install_dir}/include/${app_name}" ]] && rm -rf "${qbt_install_dir}/include/${app_name:?}"
@@ -1231,13 +1231,13 @@ _download_file() {
 	fi
 
 	if [[ "${qbt_workflow_artifacts}" == "no" ]]; then
-		# download the remote source file using curl
+		# 使用curl下载远程源文件
 		if [[ "${qbt_cache_dir_options}" = "bs" || ! -f "${qbt_dl_file_path}" ]]; then
 			_curl --create-dirs "${qbt_dl_source_url}" -o "${qbt_dl_file_path}"
 		fi
 	fi
 
-	# Set the extracted dir name to a var to easily use or remove it
+	# 将提取的目录名称设置为 var 以方便使用或删除它
 	qbt_dl_folder_path="${qbt_install_dir}/$(tar tf "${qbt_dl_file_path}" | head -1 | cut -f1 -d"/")"
 
 	printf '%b\n' "${qbt_dl_source_url}" |& _tee "${qbt_install_dir}/logs/${app_name}_${source_type}_archive_url.log" > /dev/null
@@ -1246,7 +1246,7 @@ _download_file() {
 
 	if [[ "${qbt_cache_dir_options}" != "bs" ]]; then
 		_cmd tar xf "${qbt_dl_file_path}" -C "${qbt_install_dir}" "${additional_cmds[@]}"
-		# we don't need to cd into the boost if we download it via source archives
+		# 如果我们通过源档案下载它，则不需要 cd 进入 boost
 
 		if [[ "${app_name}" == "cmake_ninja" ]]; then
 			_delete_function
@@ -1260,7 +1260,7 @@ _download_file() {
 	return
 }
 #######################################################################################################################################################
-# static lib link fix: check for *.so and *.a versions of a lib in the $lib_dir and change the *.so link to point to the static lib e.g. libdl.a
+# 静态库链接修复：检查 $lib_dir 中库的 *.so 和 *.a 版本，并将 *.so 链接更改为指向静态库，例如libdl.a
 #######################################################################################################################################################
 _fix_static_links() {
 	log_name="${app_name}"
@@ -1288,7 +1288,7 @@ _fix_multiarch_static_links() {
 	fi
 }
 #######################################################################################################################################################
-# This function is for removing files and folders we no longer need
+# 此功能用于删除我们不再需要的文件和文件夹
 #######################################################################################################################################################
 _delete_function() {
 	[[ "${app_name}" != "cmake_ninja" ]] && printf '\n'
@@ -1302,7 +1302,7 @@ _delete_function() {
 	fi
 }
 #######################################################################################################################################################
-# cmake installation
+# 安装cmake
 #######################################################################################################################################################
 _cmake() {
 	if [[ "${qbt_build_tool}" == 'cmake' ]]; then
@@ -1334,7 +1334,7 @@ _cmake() {
 	_pushd "${qbt_working_dir}"
 }
 #######################################################################################################################################################
-# This function handles the Multi Arch dynamics of the script.
+# 该函数处理脚本的多架构动态。
 #######################################################################################################################################################
 _multi_arch() {
 	if [[ "${multi_arch_options[${qbt_cross_name:-default}]}" == "${qbt_cross_name}" ]]; then
@@ -1655,7 +1655,7 @@ _multi_arch() {
 	fi
 }
 #######################################################################################################################################################
-# Github Actions release info
+# Github Actions 发布信息
 #######################################################################################################################################################
 _release_info() {
 	_error_tag
@@ -2776,15 +2776,12 @@ for app_name in "${qbt_modules[@]}"; do
 			_fix_static_links
 			[[ "${app_name}" != "boost" ]] && _delete_function
 			[[ -f "${qbt_install_dir}/logs/${app_name}.log" ]] && cp -f "${qbt_install_dir}/logs/${app_name}.log" "${release_info_dir}/"
-			if [[ "${app_name}" == "qbittorrent" ]]; then
-				_pushd "${release_info_dir}"
-				mv -v -- * "${qbt_install_dir}/completed/"
-			fi
+			[[ "${app_name}" == "qbittorrent" ]] && \
+			find "${release_info_dir}" -maxdepth 1 -type f -exec mv -v {} "${qbt_install_dir}/completed/" \;
 		fi
 
 		if [[ "${#qbt_modules_skipped[@]}" -gt '0' ]]; then
-			printf '\n'
-			printf '%b' " ${unicode_magenta_light_circle} 当前的任务进度:"
+			printf '\n%b' " ${unicode_magenta_light_circle} 当前的任务进度:"
 			for skipped_true in "${qbt_modules_skipped[@]}"; do
 				printf '%b' " ${color_cyan_light}${skipped_true}${color_end}"
 			done
