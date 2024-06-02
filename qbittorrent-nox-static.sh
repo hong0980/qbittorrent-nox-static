@@ -1696,14 +1696,14 @@ _release_info() {
 		}
 	DEPENDENCY_INFO
 
-	[[ ${qbt_workflow_files} == "no" && ${qbt_workflow_artifacts} == "no" ]] && source_text="source files - direct"
-	[[ ${qbt_workflow_files} == "yes" ]] && source_text="source files - workflows: [qbt-workflow-files](https://github.com/userdocs/qbt-workflow-files/releases/latest)"
-	[[ ${qbt_workflow_artifacts} == "yes" ]] && source_text="source files - artifacts: [qbt-workflow-files](https://github.com/userdocs/qbt-workflow-files/releases/latest)"
+	[[ ${qbt_workflow_files} == "no" && ${qbt_workflow_artifacts} == "no" ]] && source_text="源文件 - 直接"
+	[[ ${qbt_workflow_files} == "yes" ]] && source_text="源文件 - 工作流程：[qbt-workflow-files](https://github.com/userdocs/qbt-workflow-files/releases/latest)"
+	[[ ${qbt_workflow_artifacts} == "yes" ]] && source_text="源文件 - 工件：[qbt-workflow-files](https://github.com/userdocs/qbt-workflow-files/releases/latest)"
 
 	cat > "${release_info_dir}/qt${qt_version_short_array[0]}-${qbt_cross_name}-release.md" <<- RELEASE_INFO
-		## Build info
+		## 构建信息
 
-		|           Components           |           Version           |
+		|           构件           |           版本           |
 		| :----------------------------: | :-------------------------: |
 		|          Qbittorrent           | ${app_version[qbittorrent]} |
 		| Qt${qt_version_short_array[0]} |   ${app_version[qtbase]}    |
@@ -1712,16 +1712,16 @@ _release_info() {
 		|            OpenSSL             |   ${app_version[openssl]}   |
 		|            zlib-ng             |    ${app_version[zlib]}     |
 
-		## Architecture and build info
+		## 架构和构建信息
 
 		> [!NOTE]
 		> ${source_text}
 		>
-		> These builds were created on Alpine linux using [custom prebuilt musl toolchains](https://github.com/userdocs/qbt-musl-cross-make/releases/latest) for:
+		> 这些构建是使用[自定义预构建 musl 工具链](https://github.com/userdocs/qbt-musl-cross-make/releases/latest) 在 Alpine Linux 上创建的，用于：
 	RELEASE_INFO
 
 	{
-		printf '\n%s\n' "| Crossarch | Alpine Cross 构建文件 | Arch 配置|                                                             Tuning                                                              |"
+		printf '\n%s\n' "| 架构 | Alpine Cross 构建文件 | Arch 配置|                                                             Tuning                                                              |"
 		printf '%s\n' "| :---------: | :----------------------: | :---------: | :-----------------------------------------------------------------------------------------------------------------------------: |"
 		[[ "${multi_arch_options[${qbt_cross_name}]}" == armel ]] && printf '%s\n' "|    armel    |    arm-linux-musleabi    |   armv5te   |                       --with-arch=armv5te --with-tune=arm926ej-s --with-float=soft --with-abi=aapcs-linux                       |"
 		[[ "${multi_arch_options[${qbt_cross_name}]}" == armhf ]] && printf '%s\n' "|    armhf    |   arm-linux-musleabihf   |   armv6zk   |              --with-arch=armv6kz --with-tune=arm1176jzf-s --with-fpu=vfpv2 --with-float=hard --with-abi=aapcs-linux             |"
@@ -1741,7 +1741,7 @@ _release_info() {
 	} >> "${release_info_dir}/qt${qt_version_short_array[0]}-${qbt_cross_name}-release.md"
 
 	cat >> "${release_info_dir}/qt${qt_version_short_array[0]}-${qbt_cross_name}-release.md" <<- RELEASE_INFO
-		## General Info
+		## 基本信息
 
 		> [!WARNING]
 		> 从 Qbittorrent 4.4.0 开始，只要支持 Qt5 或发布了 qBitorrent V5，所有 cmake 构建都使用 Qt6，所有 qmake 构建都使用 Qt5。
