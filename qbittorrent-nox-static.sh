@@ -480,7 +480,6 @@ _set_cxx_standard() {
 	fi
 }
 
-
 # 这些函数根据 libtorrent 版本、qt 版本和 qbittorrent 组合动态设置一些构建条件
 
 _qbittorrent_build_cons() {
@@ -928,7 +927,6 @@ _set_module_urls() {
 	source_default[qtbase]="file"
 	source_default[qttools]="file"
 	source_default[qbittorrent]="file"
-
 
 	return
 }
