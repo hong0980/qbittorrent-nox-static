@@ -199,14 +199,14 @@ jobs:
           curl -sLo- "https://github.com/jgm/pandoc/releases/latest/download/pandoc-${pandoc_git_tag}-linux-amd64.tar.gz" | tar xzf - --strip-components 2 -C "$(pwd)" --exclude="share"
 
       - name: Host - 下载 1.2 qbittorrent-nox ${{github.event.inputs.distinct_id}}
-        uses: actions/download-artifact@v4.1.4
+        uses: actions/download-artifact@v4.1.7
         with:
           path: "1.2"
           pattern: libtorrent-v1.2-*-qbittorrent-nox
           merge-multiple: true
 
       - name: Host - 下载 2.0 qbittorrent-nox ${{github.event.inputs.distinct_id}}
-        uses: actions/download-artifact@v4.1.4
+        uses: actions/download-artifact@v4.1.7
         with:
           path: "2.0"
           pattern: libtorrent-v2.0-*-qbittorrent-nox
